@@ -1,0 +1,16 @@
+{
+  "_readme": "Bu dosya, uygulamanın tüm AdMob reklam kimliklerinin TEK kaynağıdır. Gerçek reklam kimliklerinizi buraya girip commit ettiğinizde, bir sonraki derlemede otomatik olarak Android/iOS projesine ve web uygulamasına işlenir (scripts/patch-ads.py tarafından). Varsayılan değerler Google'ın resmi TEST reklam kimlikleridir — gerçek reklam almazlar, güvenle test için kullanılabilir. Gerçek reklam kimliklerinizi girdikten sonra 'testMode' alanını da false yapmayı unutmayın, aksi halde uygulama gerçek kimliklerle bile test modunda kalır.",
+  "testMode": true,
+  "android": {
+    "appId": "ca-app-pub-3940256099942544~3347511713",
+    "bannerId": "ca-app-pub-3940256099942544/6300978111",
+    "interstitialId": "ca-app-pub-3940256099942544/1033173712",
+    "rewardedId": "ca-app-pub-3940256099942544/5224354917"
+  },
+  "ios": {
+    "appId": "ca-app-pub-3940256099942544~1458002511",
+    "bannerId": "ca-app-pub-3940256099942544/2934735716",
+    "interstitialId": "ca-app-pub-3940256099942544/4411468910",
+    "rewardedId": "ca-app-pub-3940256099942544/1712485313"
+  }
+}

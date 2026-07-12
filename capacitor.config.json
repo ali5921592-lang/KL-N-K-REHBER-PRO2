@@ -1,0 +1,46 @@
+{
+  "appId": "com.hemsirerehberi.pro",
+  "appName": "Klinik Rehber Pro",
+  "webDir": "www",
+  "backgroundColor": "#1657CF",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scheme": "App",
+    "webContentsDebuggingEnabled": false,
+    "allowsLinkPreview": false,
+    "scrollEnabled": true,
+    "backgroundColor": "#1657CF"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "launchAutoHide": true,
+      "backgroundColor": "#1657CF",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true,
+      "iosSpinnerStyle": "small"
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#FFFFFF"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notify",
+      "iconColor": "#1657CF"
+    },
+    "AdMob": {
+      "requestTrackingAuthorization": true,
+      "testingDevices": [],
+      "initializeForTesting": true
+    }
+  }
+}
