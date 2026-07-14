@@ -250,7 +250,7 @@ def main():
     copy_notification_icon()
     bump_version_code(version_code)
     enable_minify_and_shrink()
-
+ensure_compile_sdk()
     if has_signing:
         add_signing_config(
             keystore_path=os.environ.get("CI_KEYSTORE_PATH", "release.keystore"),
@@ -263,6 +263,21 @@ def main():
 
     log("Android proje duzenlemeleri tamamlandi.")
 
-
+def ensure_compile_sdk():
+    """compileSdkVersion ve targetSdkVersion ekle"""
+    with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    if "compileSdkVersion" not in content:
+        content = re.sub(
+            r"(android\s*\{)",
+            r"\1\n    compileSdkVersion 34\n    targetSdkVersion 34",
+            content,
+            count=1
+        )
+        log("compileSdkVersion 34 eklendi")
+    
+    with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
+        f.write(content)
 if __name__ == "__main__":
     sys.exit(main())
