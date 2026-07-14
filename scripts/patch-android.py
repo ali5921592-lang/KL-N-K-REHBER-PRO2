@@ -40,10 +40,10 @@ def strip_unnecessary_permissions():
         f.write(content)
 
     if len(content) != original_len:
-        log("Gercekten gereksiz izinler (kamera/konum/mikrofon/rehber) kaldirildi.")
+        log("Gercekten gereksiz izinler kaldirildi.")
     else:
         log("Kaldirilacak gereksiz izin bulunamadi.")
-    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU (AdMob/Analytics icin gereklidir).")
+    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU.")
 
 
 def copy_notification_icon():
@@ -101,14 +101,14 @@ def enable_minify_and_shrink():
         log("UYARI: release{} bloğu bulunamadi, minify/shrink ayarlanamadi.")
     else:
         content = new_content
-        log("Release build icin minifyEnabled=true, shrinkResources=true ayarlandi (kucuk APK/AAB).")
+        log("Release build icin minifyEnabled=true, shrinkResources=true ayarlandi.")
 
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def ensure_compile_sdk():
-    """compileSdkVersion ve targetSdkVersion ekle - REGEX KULLAN"""
+    """compileSdkVersion ve targetSdkVersion ekle - DEFAULTCONFIG BLOĞUNA"""
     if not os.path.exists(BUILD_GRADLE_PATH):
         log(f"HATA: {BUILD_GRADLE_PATH} bulunamadi.")
         return
@@ -116,25 +116,27 @@ def ensure_compile_sdk():
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
     
+    # Zaten varsa yapma
     if "compileSdkVersion" in content:
         log("compileSdkVersion zaten mevcut.")
         return
     
+    # defaultConfig { bloğunun hemen sonrasına ekle
     new_content = re.sub(
-        r'(android\s*\{)',
-        r'\1\n    compileSdkVersion 34\n    targetSdkVersion 34',
+        r'(defaultConfig\s*\{)',
+        r'\1\n        compileSdkVersion 34',
         content,
         count=1
     )
     
     if new_content == content:
-        log("UYARI: 'android {' blogu bulunamadi.")
+        log("UYARI: 'defaultConfig {' blogu bulunamadi, elle ekleyin.")
         return
     
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(new_content)
     
-    log("compileSdkVersion 34 ve targetSdkVersion 34 eklendi.")
+    log("compileSdkVersion 34 eklendi.")
 
 
 def add_signing_config(keystore_path, keystore_password, key_alias, key_password):
@@ -194,10 +196,7 @@ def add_debug_signing_fallback():
     )
     if n:
         content = new_content
-        log("UYARI: Imzalama sirlari (secrets) bulunamadi -> release build GECICI olarak "
-            "debug anahtariyla imzalandi. Bu APK/AAB test icin calisir ama Play Store'a "
-            "YUKLENEMEZ. Gercek imzalama icin repo Settings > Secrets bolumune "
-            "KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD ekleyin.")
+        log("UYARI: Imzalama sirlari (secrets) bulunamadi -> debug anahtariyla imzalandi.")
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -216,7 +215,7 @@ def set_soft_input_mode():
             'android:windowSoftInputMode="adjustResize"',
             content,
         )
-        log("windowSoftInputMode zaten mevcuttu, 'adjustResize' olarak guncellendi.")
+        log("windowSoftInputMode guncellendi.")
     else:
         pattern = re.compile(r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*)(>)')
         new_content, n = pattern.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
@@ -227,7 +226,7 @@ def set_soft_input_mode():
             log("HATA: <activity> etiketi bulunamadi, windowSoftInputMode eklenemedi.")
             return
         content = new_content
-        log("android:windowSoftInputMode=\"adjustResize\" eklendi (kritik klavye duzeltmesi).")
+        log("android:windowSoftInputMode eklendi.")
 
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         f.write(content)
