@@ -5,23 +5,12 @@ patch-android.py
 Capacitor `npx cap add android` ile tazece uretilen native Android
 projesini, GitHub Actions icinde asagidaki sekilde otomatik duzenler:
 
-  1) Gereksiz izinleri kaldirir (uygulama tamamen cevrimdisi calisir,
-     INTERNET / ACCESS_NETWORK_STATE izinlerine ihtiyac yoktur).
-  2) Bildirim ikonunu (drawable/ic_stat_notify.png) projeye kopyalar.
-  3) versionCode degerini CI build numarasina gore artirir (Play Store
-     her yuklemede daha yuksek bir versionCode ister).
-  4) Release build icin kod kucultme + kaynak kucultmeyi (R8/ProGuard,
-     shrinkResources) etkinlestirir -> daha kucuk APK/AAB boyutu.
-  5) GEREKLI ortam degiskenleri (KEYSTORE_PATH, KEYSTORE_PASSWORD,
-     KEY_ALIAS, KEY_PASSWORD) sagliandiginda, release build icin gercek
-     imzalama yapilandirmasi ekler (Play Store'a yuklenebilir AAB/APK).
-     Saglanmadiginda, release build gecici olarak debug anahtari ile
-     imzalanir (test amacli calisir/kurulabilir ama Play Store'a
-     YUKLENEMEZ - bu durum is akisi loglarinda acikca belirtilir).
-
-Bu script yalnizca CI/CD tarafindan native android/ klasoru uzerinde
-calisir; projenin www/ icindeki asil web uygulama kodunu HICBIR sekilde
-etkilemez.
+  1) Gereksiz izinleri kaldirir
+  2) Bildirim ikonunu projeye kopyalar
+  3) versionCode degerini CI build numarasina gore artirir
+  4) Release build icin kod kucultme etkinlestirir
+  5) compileSdkVersion ve targetSdkVersion ekler
+  6) Imzalama ayarlarini ekler
 """
 import os
 import re
@@ -39,12 +28,6 @@ def log(msg):
 
 
 def strip_unnecessary_permissions():
-    """NOT: Uygulama artik AdMob reklamlari ve Firebase Analytics icerdigi icin
-    INTERNET ve ACCESS_NETWORK_STATE izinleri ARTIK GEREKLIDIR ve kaldirilmaz.
-    Bu iki izin disinda (kamera, konum, mikrofon, kisiler vb.) hicbir izin
-    Capacitor varsayilan sablonunda zaten bulunmaz; bu fonksiyon yalnizca
-    ileride yanlislikla eklenebilecek gereksiz izinlere karsi bir kontrol
-    gorevi gorur ve INTERNET/ACCESS_NETWORK_STATE'e DOKUNMAZ."""
     if not os.path.exists(MANIFEST_PATH):
         log(f"UYARI: {MANIFEST_PATH} bulunamadi, izin kontrolu atlaniyor.")
         return
@@ -134,7 +117,7 @@ def enable_minify_and_shrink():
 
 
 def ensure_compile_sdk():
-    """compileSdkVersion ve targetSdkVersion ekle"""
+    """compileSdkVersion ve targetSdkVersion ekle - EN BASITE YONTEMI"""
     if not os.path.exists(BUILD_GRADLE_PATH):
         log(f"HATA: {BUILD_GRADLE_PATH} bulunamadi.")
         return
@@ -142,14 +125,22 @@ def ensure_compile_sdk():
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
     
-    if "compileSdkVersion" not in content:
-        content = re.sub(
-            r"(android\s*\{)",
-            r"\1\n    compileSdkVersion 34\n    targetSdkVersion 34",
-            content,
-            count=1
+    # Zaten varsa, yapma
+    if "compileSdkVersion" in content:
+        log("compileSdkVersion zaten mevcut, eklenmedi.")
+        return
+    
+    # android { bloğunu bul, hemen sonrasına ekle
+    if "android {" in content:
+        content = content.replace(
+            "android {",
+            "android {\n    compileSdkVersion 34\n    targetSdkVersion 34",
+            1
         )
-        log("compileSdkVersion 34 ve targetSdkVersion 34 eklendi")
+        log("compileSdkVersion 34 ve targetSdkVersion 34 eklendi.")
+    else:
+        log("UYARI: 'android {' bloğu bulunamadi, elle ekleyin.")
+        return
     
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
@@ -197,9 +188,7 @@ def add_signing_config(keystore_path, keystore_password, key_alias, key_password
 
 
 def add_debug_signing_fallback():
-    """Imzalama sirlari (secrets) saglanmadiysa, release build'in en azindan
-    calisir/kurulabilir olmasi icin debug anahtarini kullan. NOT: Bu durumda
-    uretilen AAB/APK Play Store'a YUKLENEMEZ, yalnizca test amaclidir."""
+    """Imzalama sirlari saglanmadiysa debug anahtarini kullan"""
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
@@ -223,15 +212,7 @@ def add_debug_signing_fallback():
 
 
 def set_soft_input_mode():
-    """KRİTİK KLAVYE DÜZELTMESİ: Capacitor'ın varsayılan AndroidManifest.xml
-    şablonu <activity> etiketine android:windowSoftInputMode eklemez. Bu
-    ayar olmadan Android, klavye her açıldığında pencereyi "pan" (kaydırma)
-    moduyla işler; bu da sticky/fixed pozisyonlu elemanlarla (uygulamanın
-    üst çubuğu ve alt navigasyonu gibi) çakışarak her tuş vuruşunda görsel
-    bir titreme/sıçramaya (klavyenin "düşmesi" gibi algılanan bir etkiye)
-    yol açabilir. "adjustResize" değeri, klavye açıldığında WebView'ın
-    boyutunu güvenli şekilde yeniden ayarlamasını sağlar; bu Capacitor'ın
-    da resmi olarak önerdiği ayardır."""
+    """Klavye duzeltmesi"""
     if not os.path.exists(MANIFEST_PATH):
         log(f"UYARI: {MANIFEST_PATH} bulunamadi, windowSoftInputMode atlaniyor.")
         return
@@ -246,11 +227,9 @@ def set_soft_input_mode():
         )
         log("windowSoftInputMode zaten mevcuttu, 'adjustResize' olarak guncellendi.")
     else:
-        # <activity ... android:name=".MainActivity" ...> etiketine ekle.
         pattern = re.compile(r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*)(>)')
         new_content, n = pattern.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
         if n == 0:
-            # Yedek: ilk <activity ...> etiketini hedefle (tek activity olan varsayilan Capacitor sablonu).
             pattern2 = re.compile(r'(<activity\b[^>]*)(>)')
             new_content, n = pattern2.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
         if n == 0:
@@ -267,12 +246,14 @@ def main():
     version_code = os.environ.get("CI_VERSION_CODE", "1")
     has_signing = os.environ.get("HAS_SIGNING_SECRETS", "false").lower() == "true"
 
+    log("Android proje duzenlemeleri basliyor...")
+    
     strip_unnecessary_permissions()
     set_soft_input_mode()
     copy_notification_icon()
+    ensure_compile_sdk()
     bump_version_code(version_code)
     enable_minify_and_shrink()
-    ensure_compile_sdk()
 
     if has_signing:
         add_signing_config(
