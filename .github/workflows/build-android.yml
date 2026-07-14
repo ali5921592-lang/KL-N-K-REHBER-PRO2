@@ -1,16 +1,14 @@
 name: Android APK & AAB Derle
 
-# Bu workflow, Android Studio veya manuel islem GEREKMEDEN,
-# push yaptiginizda otomatik olarak APK ve AAB uretir.
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: {}   # "Actions" sekmesinden elle de tetiklenebilir
+  workflow_dispatch: {}
   release:
     types: [ created ]
 
 permissions:
-  contents: write   # Release'e dosya eklemek icin gerekli
+  contents: write
 
 jobs:
   build:
@@ -37,6 +35,10 @@ jobs:
 
       - name: Capacitor Android platformunu ekle (tazece uretilir)
         run: npx cap add android
+
+      - name: compileSdkVersion ekle
+        run: |
+          sed -i 's/android {/android {\n    compileSdkVersion 34/' android/app/build.gradle
 
       - name: Uygulama ikonu ve splash screen gorsellerini uret
         run: npx capacitor-assets generate --android
