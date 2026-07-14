@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
 patch-android.py
------------------
-Capacitor `npx cap add android` ile tazece uretilen native Android
-projesini, GitHub Actions icinde asagidaki sekilde otomatik duzenler:
-
-  1) Gereksiz izinleri kaldirir
-  2) Bildirim ikonunu projeye kopyalar
-  3) versionCode degerini CI build numarasina gore artirir
-  4) Release build icin kod kucultme etkinlestirir
-  5) compileSdkVersion ve targetSdkVersion ekler
-  6) Imzalama ayarlarini ekler
+Capacitor Android projesini otomatik duzenler
 """
 import os
 import re
@@ -117,7 +108,7 @@ def enable_minify_and_shrink():
 
 
 def ensure_compile_sdk():
-    """compileSdkVersion ve targetSdkVersion ekle - EN BASITE YONTEMI"""
+    """compileSdkVersion ve targetSdkVersion ekle - REGEX KULLAN"""
     if not os.path.exists(BUILD_GRADLE_PATH):
         log(f"HATA: {BUILD_GRADLE_PATH} bulunamadi.")
         return
@@ -125,25 +116,25 @@ def ensure_compile_sdk():
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
     
-    # Zaten varsa, yapma
     if "compileSdkVersion" in content:
-        log("compileSdkVersion zaten mevcut, eklenmedi.")
+        log("compileSdkVersion zaten mevcut.")
         return
     
-    # android { bloğunu bul, hemen sonrasına ekle
-    if "android {" in content:
-        content = content.replace(
-            "android {",
-            "android {\n    compileSdkVersion 34\n    targetSdkVersion 34",
-            1
-        )
-        log("compileSdkVersion 34 ve targetSdkVersion 34 eklendi.")
-    else:
-        log("UYARI: 'android {' bloğu bulunamadi, elle ekleyin.")
+    new_content = re.sub(
+        r'(android\s*\{)',
+        r'\1\n    compileSdkVersion 34\n    targetSdkVersion 34',
+        content,
+        count=1
+    )
+    
+    if new_content == content:
+        log("UYARI: 'android {' blogu bulunamadi.")
         return
     
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write(new_content)
+    
+    log("compileSdkVersion 34 ve targetSdkVersion 34 eklendi.")
 
 
 def add_signing_config(keystore_path, keystore_password, key_alias, key_password):
