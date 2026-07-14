@@ -43,7 +43,6 @@ def strip_unnecessary_permissions():
         log("Gercekten gereksiz izinler kaldirildi.")
     else:
         log("Kaldirilacak gereksiz izin bulunamadi.")
-    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU.")
 
 
 def copy_notification_icon():
@@ -54,7 +53,7 @@ def copy_notification_icon():
     os.makedirs(DRAWABLE_DIR, exist_ok=True)
     dst = os.path.join(DRAWABLE_DIR, "ic_stat_notify.png")
     shutil.copyfile(src, dst)
-    log(f"Bildirim ikonu kopyalandi: {dst}")
+    log(f"Bildirim ikonu kopyalandi.")
 
 
 def bump_version_code(version_code):
@@ -98,7 +97,7 @@ def enable_minify_and_shrink():
         flags=re.DOTALL,
     )
     if n == 0:
-        log("UYARI: release{} bloğu bulunamadi, minify/shrink ayarlanamadi.")
+        log("UYARI: release blogu bulunamadi, minify/shrink ayarlanamadi.")
     else:
         content = new_content
         log("Release build icin minifyEnabled=true, shrinkResources=true ayarlandi.")
@@ -107,44 +106,12 @@ def enable_minify_and_shrink():
         f.write(content)
 
 
-def ensure_compile_sdk():
-    """compileSdkVersion ve targetSdkVersion ekle - DEFAULTCONFIG BLOĞUNA"""
-    if not os.path.exists(BUILD_GRADLE_PATH):
-        log(f"HATA: {BUILD_GRADLE_PATH} bulunamadi.")
-        return
-    
-    with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-    
-    # Zaten varsa yapma
-    if "compileSdkVersion" in content:
-        log("compileSdkVersion zaten mevcut.")
-        return
-    
-    # defaultConfig { bloğunun hemen sonrasına ekle
-    new_content = re.sub(
-        r'(defaultConfig\s*\{)',
-        r'\1\n        compileSdkVersion 34',
-        content,
-        count=1
-    )
-    
-    if new_content == content:
-        log("UYARI: 'defaultConfig {' blogu bulunamadi, elle ekleyin.")
-        return
-    
-    with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
-        f.write(new_content)
-    
-    log("compileSdkVersion 34 eklendi.")
-
-
 def add_signing_config(keystore_path, keystore_password, key_alias, key_password):
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
     if "signingConfigs" in content:
-        log("signingConfigs zaten mevcut, tekrar eklenmiyor.")
+        log("signingConfigs zaten mevcut.")
         return
 
     signing_block = f"""
@@ -160,7 +127,7 @@ def add_signing_config(keystore_path, keystore_password, key_alias, key_password
 
     new_content, n = re.subn(r"(android\s*\{)", r"\1" + signing_block, content, count=1)
     if n == 0:
-        log("HATA: 'android {' bloğu bulunamadi, imzalama eklenemedi.")
+        log("HATA: 'android {' blogu bulunamadi.")
         return
     content = new_content
 
@@ -171,17 +138,16 @@ def add_signing_config(keystore_path, keystore_password, key_alias, key_password
         count=1,
     )
     if n == 0:
-        log("UYARI: release{} bloğu bulunamadi, signingConfig atanamadi.")
+        log("UYARI: release blogu bulunamadi.")
     else:
         content = new_content
-        log("Gercek release imzalama yapilandirmasi eklendi (Play Store'a hazir).")
+        log("Release imzalama yapilandirmasi eklendi.")
 
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def add_debug_signing_fallback():
-    """Imzalama sirlari saglanmadiysa debug anahtarini kullan"""
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
@@ -196,15 +162,14 @@ def add_debug_signing_fallback():
     )
     if n:
         content = new_content
-        log("UYARI: Imzalama sirlari (secrets) bulunamadi -> debug anahtariyla imzalandi.")
+        log("UYARI: Secrets bulunamadi, debug anahtariyla imzalandi.")
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def set_soft_input_mode():
-    """Klavye duzeltmesi"""
     if not os.path.exists(MANIFEST_PATH):
-        log(f"UYARI: {MANIFEST_PATH} bulunamadi, windowSoftInputMode atlaniyor.")
+        log(f"UYARI: {MANIFEST_PATH} bulunamadi.")
         return
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         content = f.read()
@@ -215,7 +180,6 @@ def set_soft_input_mode():
             'android:windowSoftInputMode="adjustResize"',
             content,
         )
-        log("windowSoftInputMode guncellendi.")
     else:
         pattern = re.compile(r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*)(>)')
         new_content, n = pattern.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
@@ -223,10 +187,10 @@ def set_soft_input_mode():
             pattern2 = re.compile(r'(<activity\b[^>]*)(>)')
             new_content, n = pattern2.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
         if n == 0:
-            log("HATA: <activity> etiketi bulunamadi, windowSoftInputMode eklenemedi.")
+            log("HATA: <activity> etiketi bulunamadi.")
             return
         content = new_content
-        log("android:windowSoftInputMode eklendi.")
+        log("windowSoftInputMode eklendi.")
 
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         f.write(content)
@@ -236,12 +200,11 @@ def main():
     version_code = os.environ.get("CI_VERSION_CODE", "1")
     has_signing = os.environ.get("HAS_SIGNING_SECRETS", "false").lower() == "true"
 
-    log("Android proje duzenlemeleri basliyor...")
+    log("Duzenlemeler basliyor...")
     
     strip_unnecessary_permissions()
     set_soft_input_mode()
     copy_notification_icon()
-    ensure_compile_sdk()
     bump_version_code(version_code)
     enable_minify_and_shrink()
 
@@ -255,7 +218,7 @@ def main():
     else:
         add_debug_signing_fallback()
 
-    log("Android proje duzenlemeleri tamamlandi.")
+    log("Duzenlemeler tamamlandi.")
 
 
 if __name__ == "__main__":
