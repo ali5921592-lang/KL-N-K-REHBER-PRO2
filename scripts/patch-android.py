@@ -1,7 +1,27 @@
 #!/usr/bin/env python3
 """
 patch-android.py
-Capacitor Android projesini otomatik duzenler
+-----------------
+Capacitor `npx cap add android` ile tazece uretilen native Android
+projesini, GitHub Actions icinde asagidaki sekilde otomatik duzenler:
+
+  1) Gereksiz izinleri kaldirir (uygulama tamamen cevrimdisi calisir,
+     INTERNET / ACCESS_NETWORK_STATE izinlerine ihtiyac yoktur).
+  2) Bildirim ikonunu (drawable/ic_stat_notify.png) projeye kopyalar.
+  3) versionCode degerini CI build numarasina gore artirir (Play Store
+     her yuklemede daha yuksek bir versionCode ister).
+  4) Release build icin kod kucultme + kaynak kucultmeyi (R8/ProGuard,
+     shrinkResources) etkinlestirir -> daha kucuk APK/AAB boyutu.
+  5) GEREKLI ortam degiskenleri (KEYSTORE_PATH, KEYSTORE_PASSWORD,
+     KEY_ALIAS, KEY_PASSWORD) sagliandiginda, release build icin gercek
+     imzalama yapilandirmasi ekler (Play Store'a yuklenebilir AAB/APK).
+     Saglanmadiginda, release build gecici olarak debug anahtari ile
+     imzalanir (test amacli calisir/kurulabilir ama Play Store'a
+     YUKLENEMEZ - bu durum is akisi loglarinda acikca belirtilir).
+
+Bu script yalnizca CI/CD tarafindan native android/ klasoru uzerinde
+calisir; projenin www/ icindeki asil web uygulama kodunu HICBIR sekilde
+etkilemez.
 """
 import os
 import re
@@ -19,6 +39,12 @@ def log(msg):
 
 
 def strip_unnecessary_permissions():
+    """NOT: Uygulama artik AdMob reklamlari ve Firebase Analytics icerdigi icin
+    INTERNET ve ACCESS_NETWORK_STATE izinleri ARTIK GEREKLIDIR ve kaldirilmaz.
+    Bu iki izin disinda (kamera, konum, mikrofon, kisiler vb.) hicbir izin
+    Capacitor varsayilan sablonunda zaten bulunmaz; bu fonksiyon yalnizca
+    ileride yanlislikla eklenebilecek gereksiz izinlere karsi bir kontrol
+    gorevi gorur ve INTERNET/ACCESS_NETWORK_STATE'e DOKUNMAZ."""
     if not os.path.exists(MANIFEST_PATH):
         log(f"UYARI: {MANIFEST_PATH} bulunamadi, izin kontrolu atlaniyor.")
         return
@@ -40,9 +66,10 @@ def strip_unnecessary_permissions():
         f.write(content)
 
     if len(content) != original_len:
-        log("Gercekten gereksiz izinler kaldirildi.")
+        log("Gercekten gereksiz izinler (kamera/konum/mikrofon/rehber) kaldirildi.")
     else:
         log("Kaldirilacak gereksiz izin bulunamadi.")
+    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU (AdMob/Analytics icin gereklidir).")
 
 
 def copy_notification_icon():
@@ -53,7 +80,7 @@ def copy_notification_icon():
     os.makedirs(DRAWABLE_DIR, exist_ok=True)
     dst = os.path.join(DRAWABLE_DIR, "ic_stat_notify.png")
     shutil.copyfile(src, dst)
-    log(f"Bildirim ikonu kopyalandi.")
+    log(f"Bildirim ikonu kopyalandi: {dst}")
 
 
 def bump_version_code(version_code):
@@ -97,23 +124,49 @@ def enable_minify_and_shrink():
         flags=re.DOTALL,
     )
     if n == 0:
-        log("UYARI: release blogu bulunamadi, minify/shrink ayarlanamadi.")
+        log("UYARI: release{} bloğu bulunamadi, minify/shrink ayarlanamadi.")
     else:
         content = new_content
-        log("Release build icin minifyEnabled=true, shrinkResources=true ayarlandi.")
+        log("Release build icin minifyEnabled=true, shrinkResources=true ayarlandi (kucuk APK/AAB).")
 
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def add_signing_config(keystore_path, keystore_password, key_alias, key_password):
+    """GERCEK release imzalama yapilandirmasini ekler.
+
+    ONEMLI SIRALAMA: signingConfig atamasi (buildTypes.release icine),
+    signingConfigs {} blogu HENUZ EKLENMEDEN once yapilir. Aksi halde
+    'release {' araniirken, az once eklenen signingConfigs.release
+    blogunun kendisi bulunur ve signingConfig satiri YANLISLIKLA
+    signingConfigs.release'in ICINE eklenir. Bu da Gradle'da
+    'Could not find method signingConfig() for arguments [...]' hatasina
+    yol acar (cunku SigningConfig nesnesinin boyle bir metodu yoktur).
+    """
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
     if "signingConfigs" in content:
-        log("signingConfigs zaten mevcut.")
+        log("signingConfigs zaten mevcut, tekrar eklenmiyor.")
         return
 
+    # 1) ONCE: signingConfig atamasini buildTypes.release icine ekle.
+    #    Bu noktada dosyada henuz TEK bir "release {" vardir (buildTypes
+    #    icindeki), bu yuzden regex yanlis yere gidemez.
+    new_content, n = re.subn(
+        r"(release\s*\{)",
+        r"\1\n            signingConfig signingConfigs.release",
+        content,
+        count=1,
+    )
+    if n == 0:
+        log("UYARI: release{} bloğu bulunamadi, signingConfig atanamadi.")
+    else:
+        content = new_content
+        log("signingConfig signingConfigs.release atamasi buildTypes.release icine eklendi.")
+
+    # 2) SONRA: signingConfigs {} blogunu android {} icine ekle.
     signing_block = f"""
     signingConfigs {{
         release {{
@@ -127,27 +180,19 @@ def add_signing_config(keystore_path, keystore_password, key_alias, key_password
 
     new_content, n = re.subn(r"(android\s*\{)", r"\1" + signing_block, content, count=1)
     if n == 0:
-        log("HATA: 'android {' blogu bulunamadi.")
+        log("HATA: 'android {' bloğu bulunamadi, imzalama eklenemedi.")
         return
     content = new_content
-
-    new_content, n = re.subn(
-        r"(release\s*\{)",
-        r"\1\n            signingConfig signingConfigs.release",
-        content,
-        count=1,
-    )
-    if n == 0:
-        log("UYARI: release blogu bulunamadi.")
-    else:
-        content = new_content
-        log("Release imzalama yapilandirmasi eklendi.")
+    log("Gercek release imzalama yapilandirmasi eklendi (Play Store'a hazir).")
 
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def add_debug_signing_fallback():
+    """Imzalama sirlari (secrets) saglanmadiysa, release build'in en azindan
+    calisir/kurulabilir olmasi icin debug anahtarini kullan. NOT: Bu durumda
+    uretilen AAB/APK Play Store'a YUKLENEMEZ, yalnizca test amaclidir."""
     with open(BUILD_GRADLE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
 
@@ -162,14 +207,26 @@ def add_debug_signing_fallback():
     )
     if n:
         content = new_content
-        log("UYARI: Secrets bulunamadi, debug anahtariyla imzalandi.")
+        log("UYARI: Imzalama sirlari (secrets) bulunamadi -> release build GECICI olarak "
+            "debug anahtariyla imzalandi. Bu APK/AAB test icin calisir ama Play Store'a "
+            "YUKLENEMEZ. Gercek imzalama icin repo Settings > Secrets bolumune "
+            "KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD ekleyin.")
     with open(BUILD_GRADLE_PATH, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def set_soft_input_mode():
+    """KRİTİK KLAVYE DÜZELTMESİ: Capacitor'ın varsayılan AndroidManifest.xml
+    şablonu <activity> etiketine android:windowSoftInputMode eklemez. Bu
+    ayar olmadan Android, klavye her açıldığında pencereyi "pan" (kaydırma)
+    moduyla işler; bu da sticky/fixed pozisyonlu elemanlarla (uygulamanın
+    üst çubuğu ve alt navigasyonu gibi) çakışarak her tuş vuruşunda görsel
+    bir titreme/sıçramaya (klavyenin "düşmesi" gibi algılanan bir etkiye)
+    yol açabilir. "adjustResize" değeri, klavye açıldığında WebView'ın
+    boyutunu güvenli şekilde yeniden ayarlamasını sağlar; bu Capacitor'ın
+    da resmi olarak önerdiği ayardır."""
     if not os.path.exists(MANIFEST_PATH):
-        log(f"UYARI: {MANIFEST_PATH} bulunamadi.")
+        log(f"UYARI: {MANIFEST_PATH} bulunamadi, windowSoftInputMode atlaniyor.")
         return
     with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
         content = f.read()
@@ -180,17 +237,20 @@ def set_soft_input_mode():
             'android:windowSoftInputMode="adjustResize"',
             content,
         )
+        log("windowSoftInputMode zaten mevcuttu, 'adjustResize' olarak guncellendi.")
     else:
+        # <activity ... android:name=".MainActivity" ...> etiketine ekle.
         pattern = re.compile(r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*)(>)')
         new_content, n = pattern.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
         if n == 0:
+            # Yedek: ilk <activity ...> etiketini hedefle (tek activity olan varsayilan Capacitor sablonu).
             pattern2 = re.compile(r'(<activity\b[^>]*)(>)')
             new_content, n = pattern2.subn(r'\1 android:windowSoftInputMode="adjustResize"\2', content, count=1)
         if n == 0:
-            log("HATA: <activity> etiketi bulunamadi.")
+            log("HATA: <activity> etiketi bulunamadi, windowSoftInputMode eklenemedi.")
             return
         content = new_content
-        log("windowSoftInputMode eklendi.")
+        log("android:windowSoftInputMode=\"adjustResize\" eklendi (kritik klavye duzeltmesi).")
 
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         f.write(content)
@@ -200,8 +260,6 @@ def main():
     version_code = os.environ.get("CI_VERSION_CODE", "1")
     has_signing = os.environ.get("HAS_SIGNING_SECRETS", "false").lower() == "true"
 
-    log("Duzenlemeler basliyor...")
-    
     strip_unnecessary_permissions()
     set_soft_input_mode()
     copy_notification_icon()
@@ -218,7 +276,7 @@ def main():
     else:
         add_debug_signing_fallback()
 
-    log("Duzenlemeler tamamlandi.")
+    log("Android proje duzenlemeleri tamamlandi.")
 
 
 if __name__ == "__main__":
