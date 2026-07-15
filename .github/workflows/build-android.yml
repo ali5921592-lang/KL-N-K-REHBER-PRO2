@@ -1,14 +1,16 @@
 name: Android APK & AAB Derle
 
+# Bu workflow, Android Studio veya manuel islem GEREKMEDEN,
+# push yaptiginizda otomatik olarak APK ve AAB uretir.
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # "Actions" sekmesinden elle de tetiklenebilir
   release:
     types: [ created ]
 
 permissions:
-  contents: write
+  contents: write   # Release'e dosya eklemek icin gerekli
 
 jobs:
   build:
@@ -36,16 +38,8 @@ jobs:
       - name: Capacitor Android platformunu ekle (tazece uretilir)
         run: npx cap add android
 
-      - name: DEBUG - Patch ONCESI build.gradle
-        run: |
-          echo "===== android/build.gradle ====="
-          cat android/build.gradle
-          echo ""
-          echo "===== android/variables.gradle ====="
-          cat android/variables.gradle
-          echo ""
-          echo "===== android/app/build.gradle (PATCH ONCESI) ====="
-          cat android/app/build.gradle
+      - name: Android SDK versiyonlarini garanti altina al (compileSdk hatasi icin)
+        run: python3 scripts/ensure-android-sdk.py
 
       - name: Uygulama ikonu ve splash screen gorsellerini uret
         run: npx capacitor-assets generate --android
@@ -80,9 +74,12 @@ jobs:
           CI_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: python3 scripts/patch-android.py
 
-      - name: DEBUG - Patch SONRASI build.gradle
+      - name: DEBUG - build.gradle icerigini goster (sorun cikarsa buradan bakilir)
         run: |
-          echo "===== android/app/build.gradle (PATCH SONRASI) ====="
+          echo "===== android/variables.gradle ====="
+          cat android/variables.gradle
+          echo ""
+          echo "===== android/app/build.gradle ====="
           cat android/app/build.gradle
 
       - name: Gradle wrapper'a calistirma izni ver
@@ -111,10 +108,18 @@ jobs:
           echo "### 📦 Derleme Sonuclari" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ steps.signing-check.outputs.has_signing }}" = "true" ]; then
-            echo "✅ **Imzalama:** Gercek release anahtariyla imzalandi." >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ **Imzalama:** Gercek release anahtariyla imzalandi. Bu AAB dogrudan Play Store'a yuklenebilir." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "⚠️ **Imzalama:** Sirlar tanimlanmadigi icin debug anahtariyla imzalandi." >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **Imzalama:** Sirlar (secrets) tanimlanmadigi icin bu build GECICI debug anahtariyla imzalandi." >> "$GITHUB_STEP_SUMMARY"
+            echo "Bu haliyle APK/AAB **test icin kurulabilir** ama **Play Store'a yuklenemez**." >> "$GITHUB_STEP_SUMMARY"
+            echo "Play Store'a hazir imzali build icin repo Settings > Secrets and variables > Actions bolumune su sirlari ekleyin:" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`KEYSTORE_BASE64\` (keystore dosyanizin base64 hali)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`KEYSTORE_PASSWORD\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`KEY_ALIAS\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`KEY_PASSWORD\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "(Detayli adimlar icin README.md dosyasina bakin.)" >> "$GITHUB_STEP_SUMMARY"
           fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- versionCode: \`${{ github.run_number }}\`" >> "$GITHUB_STEP_SUMMARY"
           find android/app/build/outputs/apk/release -name "*.apk" -exec echo "- APK: {}" \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
           find android/app/build/outputs/bundle/release -name "*.aab" -exec echo "- AAB: {}" \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
