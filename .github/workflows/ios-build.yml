@@ -53,13 +53,26 @@ jobs:
       - name: Node.js kur
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+
+      - name: xcpretty kur (log ciktisi icin)
+        run: gem install xcpretty --no-document
 
       - name: NPM bagimliliklarini kur
         run: npm install
 
-      - name: Capacitor iOS platformunu ekle (tazece uretilir)
-        run: npx cap add ios
+      # DUZELTME: ios/ klasoru repoda commit edilmis oldugu icin
+      # "npx cap add ios" her calistiginda "platform already exists"
+      # hatasi verip is akisini durduruyordu. Artik sadece klasor
+      # yoksa ekleniyor, varsa dogrudan sync ile guncelleniyor.
+      - name: Capacitor iOS platformunu ekle (yoksa) / var olani kullan
+        run: |
+          if [ ! -d "ios" ]; then
+            echo "ios/ klasoru bulunamadi, olusturuluyor..."
+            npx cap add ios
+          else
+            echo "ios/ klasoru repoda mevcut, dogrudan kullanilacak."
+          fi
 
       - name: Uygulama ikonu ve splash screen gorsellerini uret
         run: npx capacitor-assets generate --ios
