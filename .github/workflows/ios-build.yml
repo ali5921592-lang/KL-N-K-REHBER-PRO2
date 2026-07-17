@@ -161,6 +161,7 @@ jobs:
             MARKETING_VERSION="${{ steps.params.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.params.outputs.build_number }}" \
             CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             archive 2>&1 | tee /tmp/archive.log | xcpretty; then
