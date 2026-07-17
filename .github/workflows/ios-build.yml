@@ -67,6 +67,9 @@ jobs:
       - name: Reklam kimliklerini (AdMob) projeye isle
         run: python3 scripts/patch-ads.py
 
+      - name: Podfile'i yamala (Pods hedeflerinde kod imzalamayi devre disi birak)
+        run: python3 scripts/patch-podfile.py
+
       - name: CocoaPods bagimliliklarini da iceren senkronizasyon
         run: npx cap sync ios
 
