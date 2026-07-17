@@ -1,18 +1,5 @@
 name: iOS IPA Derle
 
-# Bu workflow bir macOS runner uzerinde calisir (Xcode gerektigi icin).
-# GitHub Actions'in macOS runner'lari Xcode'u onceden kurulu getirir;
-# sizin Mac veya Xcode kurmaniza gerek yoktur.
-#
-# ONEMLI: Apple, imzali (App Store'a yuklenebilir) bir .ipa uretebilmek
-# icin GERCEK bir Apple Developer Program uyeligi (yillik $99) ve o hesaptan
-# uretilmis bir Distribution sertifikasi + provisioning profile ister.
-# Bu bilgiler yalnizca SIZIN Apple Developer hesabinizdan alinabilir; bu
-# workflow bunlari sizin yerinize "uretemez". Asagidaki 5 secret
-# tanimlanmadigi surece bu workflow, projenin Xcode'da SORUNSUZ ACILDIGINI
-# VE DERLENDIGINI dogrulamak icin yalnizca bir SIMULATOR derlemesi (duman
-# testi) yapar. Secret'lar eklendiginde otomatik olarak gercek, imzali,
-# App Store'a yuklenebilir bir .ipa uretir.
 on:
   push:
     branches: [ main, master ]
@@ -58,7 +45,7 @@ jobs:
       - name: NPM bagimliliklarini kur
         run: npm install
 
-      - name: Capacitor iOS platformunu ekle (tazece uretilir)
+      - name: Capacitor iOS platformunu ekle
         run: npx cap add ios
 
       - name: Uygulama ikonu ve splash screen gorsellerini uret
@@ -70,10 +57,10 @@ jobs:
       - name: CocoaPods bagimliliklarini da iceren senkronizasyon
         run: npx cap sync ios
 
-      - name: iOS projesini duzenle (Privacy Manifest, Info.plist, ekran yonleri)
+      - name: iOS projesini duzenle
         run: python3 scripts/patch-ios.py
 
-      - name: Privacy Manifest'i Xcode projesine gercekten kaydet (Copy Bundle Resources)
+      - name: Privacy Manifest'i Xcode projesine gercekten kaydet
         run: |
           gem install xcodeproj --no-document
           ruby scripts/add_privacy_manifest_to_xcodeproj.rb
@@ -92,7 +79,6 @@ jobs:
           echo "bundle_id=$BUNDLE_ID" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUM" >> "$GITHUB_OUTPUT"
-          echo "Bundle ID: $BUNDLE_ID / Version: $VERSION / Build: $BUILD_NUM"
 
       - name: Imzalama sirlari mevcut mu kontrol et
         id: signing-check
@@ -103,8 +89,7 @@ jobs:
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ============ SECRET'LAR YOKSA: SIMULATOR DUMAN TESTI ============
-      - name: "[Imzasiz mod] Simulator icin derle (proje saglik kontrolu)"
+      - name: "[Imzasiz mod] Simulator icin derle"
         if: steps.signing-check.outputs.has_signing == 'false'
         run: |
           xcodebuild -workspace ios/App/App.xcworkspace \
@@ -115,15 +100,7 @@ jobs:
             MARKETING_VERSION="${{ steps.params.outputs.version }}" \
             CURRENT_PROJECT_VERSION="${{ steps.params.outputs.build_number }}" \
             build | xcpretty || true
-          echo "### ⚠️ İmzasız Mod (Duman Testi)" >> "$GITHUB_STEP_SUMMARY"
-          echo "Apple imzalama sirlari (secrets) tanimlanmadigi icin gercek bir .ipa uretilmedi." >> "$GITHUB_STEP_SUMMARY"
-          echo "Bunun yerine proje simulator icin basariyla derlendi mi diye kontrol edildi (yukaridaki log)." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**App Store'a yuklenebilir gercek bir .ipa icin gerekli 5 secret:**" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`IOS_DIST_CERT_BASE64\`, \`IOS_DIST_CERT_PASSWORD\`, \`IOS_PROVISION_PROFILE_BASE64\`, \`IOS_TEAM_ID\`, \`IOS_PROFILE_NAME\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "(Detayli adimlar icin README.md dosyasina bakin.)" >> "$GITHUB_STEP_SUMMARY"
 
-      # ============ SECRET'LAR VARSA: GERÇEK İMZALI .IPA ============
       - name: "[İmzalı mod] Sertifika ve provisioning profile kur"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
@@ -133,19 +110,14 @@ jobs:
         run: |
           KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-
           echo "$CERT_BASE64" | base64 -d > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security import certificate.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm -f certificate.p12
-
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
-      - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
+      - name: "[İmzalı mod] Arşivle"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
@@ -163,37 +135,29 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             archive | xcpretty
-          echo "Arsivleme tamamlandi."
 
       - name: "[İmzalı mod] exportOptions.plist olustur"
         if: steps.signing-check.outputs.has_signing == 'true'
-        env:
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          IOS_PROFILE_NAME: ${{ secrets.IOS_PROFILE_NAME }}
-          BUNDLE_ID: ${{ steps.params.outputs.bundle_id }}
         run: python3 scripts/generate-export-options.py
 
-      - name: "[İmzalı mod] .ipa olarak dısa aktar (xcodebuild -exportArchive)"
+      - name: "[İmzalı mod] .ipa olarak dısa aktar"
         if: steps.signing-check.outputs.has_signing == 'true'
         run: |
           xcodebuild -exportArchive \
             -archivePath build/App.xcarchive \
             -exportPath build/ipa \
             -exportOptionsPlist exportOptions.plist | xcpretty
-          echo "### ✅ App Store'a Hazir IPA Uretildi" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Bundle ID: \`${{ steps.params.outputs.bundle_id }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Versiyon: \`${{ steps.params.outputs.version }}\` (Build \`${{ steps.params.outputs.build_number }}\`)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: IPA'yi is akisi ciktisi olarak yukle
         if: steps.signing-check.outputs.has_signing == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: hemsire-rehberi-pro-ipa
-          path: "*/.ipa"
+          path: build/ipa/*.ipa
           if-no-files-found: error
           retention-days: 90
 
-      - name: Dosyalari GitHub Release'e ekle (yalnizca release olayinda)
+      - name: Dosyalari GitHub Release'e ekle
         if: steps.signing-check.outputs.has_signing == 'true' && github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
