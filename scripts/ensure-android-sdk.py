@@ -29,9 +29,9 @@ ROOT_BUILD_GRADLE = os.path.join(ANDROID_DIR, "build.gradle")
 VARIABLES_GRADLE = os.path.join(ANDROID_DIR, "variables.gradle")
 
 # Guvenli, guncel varsayilan degerler.
-COMPILE_SDK = 35
-TARGET_SDK = 35
-MIN_SDK = 22
+COMPILE_SDK = 36
+TARGET_SDK = 36
+MIN_SDK = 23
 
 
 def log(msg):
