@@ -7,16 +7,18 @@ if os.path.exists(consent_file):
     with open(consent_file, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 1. HATA ÇÖZÜMÜ: Sadece UMPRequestParameters objesinin özelliğini değiştiriyoruz. 
-    # JS'den gelen değişken adını bozmamak için '=' işaretini referans alıyoruz.
+    # 1. Aşama: Parametre ve Fonksiyon Çağrısı Hataları (Önceki çözdüklerimiz)
     content = content.replace("parameters.tagForUnderAgeOfConsent =", "parameters.isTaggedForUnderAgeOfConsent =")
-
-    # 2. HATA ÇÖZÜMÜ: Fonksiyon çağrısındaki parametre adını güncelliyoruz.
     content = content.replace("ConsentForm.load(completionHandler:", "ConsentForm.load(with:")
+
+    # 2. Aşama: Yeni Çıkan Sınıf İsmi (UMP Takısı) ve Değişken Hataları
+    content = content.replace("UMPConsentInformation", "ConsentInformation")
+    content = content.replace("sharedInstance", "shared")
+    content = content.replace("UMPConsentStatus", "ConsentStatus")
 
     with open(consent_file, "w", encoding="utf-8") as f:
         f.write(content)
     
-    print("ConsentExecutor.swift başarıyla yamalandı!")
+    print("ConsentExecutor.swift içindeki TÜM eski Google SDK referansları başarıyla güncellendi!")
 else:
     print(f"Hata: Dosya bulunamadı -> {consent_file}")
