@@ -176,6 +176,20 @@
   .abg-result .abg-main{font-size:15px;font-weight:800;color:var(--blue-700);margin-bottom:6px;}
   .abg-result .abg-line{font-size:12.5px;color:var(--ink);margin-bottom:3px;}
   .notif-banner{background:var(--red-bg);border:1px solid var(--red);color:var(--red);border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:12px;font-weight:600;}
+
+  /* ===== KAYNAK / REFERANS GÖSTERİMİ (App Store 1.4.1) ===== */
+  .src-box{background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--blue-500);border-radius:10px;padding:10px 12px;margin:12px 0 4px;}
+  .src-box .src-head{font-size:10.5px;font-weight:800;color:var(--blue-700);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+  .src-box ul,.src-list{margin:0;padding-left:16px;}
+  .src-box li,.src-list li{font-size:11.5px;line-height:1.6;margin-bottom:5px;color:var(--ink-2);}
+  .src-link{color:var(--blue-700);text-decoration:underline;font-weight:600;word-break:break-word;}
+  .src-link:active{opacity:.55;}
+  .src-inline{color:var(--blue-700);text-decoration:underline;font-weight:700;cursor:pointer;}
+  .src-updated{font-size:10.5px;color:var(--ink-2);margin-top:7px;line-height:1.5;font-style:italic;}
+  .src-banner{background:var(--blue-100);border:1px solid var(--blue-500);color:var(--blue-700);border-radius:12px;padding:10px 12px;font-size:11.5px;line-height:1.55;margin-bottom:14px;font-weight:600;}
+  .src-banner .src-inline{color:var(--blue-700);}
+  .btn-outline{background:transparent;color:var(--blue-700);border:1.5px solid var(--blue-700);padding:10px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;}
+  .btn-outline:active{opacity:.6;}
 </style>
 </head>
 <body>
@@ -240,6 +254,233 @@
 <script>
 /* ============ DATA LAYER ============ */
 const DISCLAIMER = "Bu uygulama yalnızca eğitim ve bilgi amaçlıdır. Klinik kararlar için resmi kılavuzlar ve ilgili sağlık profesyonellerinin değerlendirmesi esas alınmalıdır.";
+
+/* ============================================================
+   UYGULAMA İÇİ SATIN ALMA (IAP) BAYRAĞI
+   App Store İnceleme Yönergesi 2.1(b) — Uygulama Tamamlığı
+   ------------------------------------------------------------
+   Bu bayrak `false` olduğu sürece uygulama, kullanıcıya
+   HİÇBİR yerde "Premium", "üyelik", "satın alma" veya ücretli
+   bir plana yükseltme İMASINDA BULUNMAZ. Böylece App Store
+   Connect'te henüz oluşturulmamış/incelemeye gönderilmemiş bir
+   uygulama içi satın alma ürününe atıf yapılmaz.
+
+   Gerçek bir uygulama içi satın alma eklemek isterseniz:
+     1. App Store Connect > Uygulamanız > Uygulama İçi Satın Almalar
+        bölümünden ürünü (ör. kaldırılabilir olmayan "Reklamsız
+        Sürüm") oluşturun, fiyatlandırın, yerelleştirmesini,
+        inceleme ekran görüntüsünü ve inceleme notunu doldurun.
+     2. Ürünün durumunu "İncelemeye Gönderilmeye Hazır" yapın ve
+        yeni ikili dosyayla BİRLİKTE incelemeye gönderin.
+     3. Uygulamaya gerçek bir StoreKit satın alma akışı ekleyin
+        (satın al + "Satın Alımları Geri Yükle" düğmesi zorunludur).
+     4. Ancak bundan sonra bu bayrağı `true` yapın.
+   ============================================================ */
+const PREMIUM_IAP_ENABLED = false;
+
+/* ============================================================
+   KAYNAK / REFERANS MODÜLÜ
+   App Store İnceleme Yönergesi 1.4.1 (Güvenlik – Fiziksel Zarar)
+   uyumu için eklenmiştir.
+
+   Uygulamadaki tıbbi/sağlık bilgilerinin dayandığı kaynaklar
+   burada merkezi olarak tanımlanır ve ilgili her ekranda
+   TIKLANABİLİR BAĞLANTI olarak kullanıcıya gösterilir.
+   ============================================================ */
+const SOURCES_LAST_REVIEW = '31.07.2026';
+
+const SOURCES = {
+  sb:        {t:'T.C. Sağlık Bakanlığı — Resmî sağlık rehberleri, tanı ve tedavi kılavuzları', p:'T.C. Sağlık Bakanlığı', y:'güncel', u:'https://www.saglik.gov.tr'},
+  titck:     {t:'Kısa Ürün Bilgisi (KÜB) ve Kullanma Talimatı (KT) Arşivi', p:'TİTCK — Türkiye İlaç ve Tıbbi Cihaz Kurumu', y:'sürekli güncellenir', u:'https://www.titck.gov.tr/kubkt'},
+  who:       {t:'Dünya Sağlık Örgütü — Sağlık konuları ve klinik rehberler', p:'World Health Organization (WHO)', y:'güncel', u:'https://www.who.int'},
+  whoobesity:{t:'Obezite ve Vücut Kitle İndeksi (BMI) sınıflandırması', p:'World Health Organization (WHO)', y:'güncel', u:'https://www.who.int/health-topics/obesity'},
+  whoipc:    {t:'Enfeksiyon Önleme ve Kontrol (el hijyeni dâhil)', p:'World Health Organization (WHO)', y:'güncel', u:'https://www.who.int/health-topics/infection-prevention-and-control'},
+  cdc:       {t:'Hastalık Kontrol ve Önleme Merkezleri — enfeksiyon ve klinik öneriler', p:'CDC (ABD)', y:'güncel', u:'https://www.cdc.gov'},
+  nice:      {t:'NICE Klinik Kılavuzları', p:'National Institute for Health and Care Excellence (İngiltere)', y:'güncel', u:'https://www.nice.org.uk/guidance'},
+  niceiv:    {t:'CG174 — Erişkinlerde hastanede intravenöz sıvı tedavisi', p:'NICE (İngiltere)', y:'2017 güncellemesi', u:'https://www.nice.org.uk/guidance/cg174'},
+  medlineplus:{t:'MedlinePlus İlaç Bilgileri', p:'ABD Ulusal Tıp Kütüphanesi (NLM)', y:'güncel', u:'https://medlineplus.gov/druginformation.html'},
+  medlinelab:{t:'MedlinePlus Laboratuvar Testleri Rehberi', p:'ABD Ulusal Tıp Kütüphanesi (NLM)', y:'güncel', u:'https://medlineplus.gov/lab-tests/'},
+  dailymed:  {t:'DailyMed — FDA onaylı resmî ilaç prospektüsleri', p:'ABD Ulusal Tıp Kütüphanesi (NLM)', y:'sürekli güncellenir', u:'https://dailymed.nlm.nih.gov/dailymed/'},
+  fda:       {t:'FDA İlaç Bilgi Merkezi', p:'U.S. Food and Drug Administration', y:'güncel', u:'https://www.fda.gov/drugs'},
+  statpearls:{t:'StatPearls / NCBI Bookshelf — hakemli klinik başvuru metinleri', p:'ABD Ulusal Biyoteknoloji Bilgi Merkezi (NCBI)', y:'güncel', u:'https://www.ncbi.nlm.nih.gov/books/'},
+  pubmed:    {t:'PubMed — hakemli tıbbi literatür veritabanı', p:'ABD Ulusal Tıp Kütüphanesi (NLM)', y:'güncel', u:'https://pubmed.ncbi.nlm.nih.gov'},
+  msd:       {t:'MSD Manuals — Profesyonel Sürüm', p:'Merck & Co., Inc.', y:'güncel', u:'https://www.msdmanuals.com/professional'},
+  esc:       {t:'ESC Klinik Uygulama Kılavuzları (kardiyoloji)', p:'European Society of Cardiology', y:'güncel', u:'https://www.escardio.org/Guidelines'},
+  tkd:       {t:'Türk Kardiyoloji Derneği kılavuz ve uzlaşı raporları', p:'Türk Kardiyoloji Derneği', y:'güncel', u:'https://tkd.org.tr'},
+  aha:       {t:'American Heart Association — bilimsel bildiriler ve kılavuzlar', p:'American Heart Association', y:'güncel', u:'https://www.heart.org'},
+  ahacpr:    {t:'CPR ve Acil Kardiyovasküler Bakım Kılavuzları', p:'American Heart Association', y:'güncel', u:'https://cpr.heart.org/en/resuscitation-science/cpr-and-ecc-guidelines'},
+  erc:       {t:'Avrupa Resüsitasyon Konseyi Kardiyopulmoner Resüsitasyon Kılavuzları', p:'European Resuscitation Council (ERC)', y:'2025', u:'https://cprguidelines.eu'},
+  ssc:       {t:'Surviving Sepsis Campaign — sepsis ve septik şok kılavuzları', p:'SCCM / ESICM', y:'güncel', u:'https://www.sccm.org/survivingsepsiscampaign/guidelines-and-resources'},
+  kdigo:     {t:'KDIGO Klinik Uygulama Kılavuzları (böbrek hastalıkları)', p:'Kidney Disease: Improving Global Outcomes', y:'güncel', u:'https://kdigo.org/guidelines/'},
+  ada:       {t:'Standards of Care in Diabetes (Diabetes Care dergisi)', p:'American Diabetes Association', y:'yıllık güncellenir', u:'https://diabetesjournals.org/care'},
+  gold:      {t:'GOLD Raporu — KOAH tanı, tedavi ve önleme stratejisi', p:'Global Initiative for Chronic Obstructive Lung Disease', y:'yıllık güncellenir', u:'https://goldcopd.org'},
+  gina:      {t:'GINA — Astım tedavi ve önleme stratejisi', p:'Global Initiative for Asthma', y:'yıllık güncellenir', u:'https://ginasthma.org'},
+  ttd:       {t:'Türk Toraks Derneği kılavuz ve uzlaşı raporları', p:'Türk Toraks Derneği', y:'güncel', u:'https://www.toraks.org.tr'},
+  ismp:      {t:'İlaç güvenliği önerileri ve karışan (LASA) ilaç isimleri listeleri', p:'ISMP — Institute for Safe Medication Practices', y:'güncel', u:'https://www.ismp.org'},
+  ismphigh:  {t:'Akut Bakımda Yüksek Riskli İlaçlar Listesi', p:'ISMP — Institute for Safe Medication Practices', y:'2024', u:'https://home.ecri.org/blogs/ismp-resources/high-alert-medications-in-acute-care-settings'},
+  nanda:     {t:'NANDA International — hemşirelik tanıları sınıflaması', p:'NANDA International, Inc.', y:'güncel', u:'https://nanda.org'},
+  ckdepi:    {t:'Inker LA ve ark. "New Creatinine- and Cystatin C–Based Equations to Estimate GFR without Race" (CKD-EPI 2021 denklemi)', p:'N Engl J Med 2021;385:1737-1749', y:'2021', u:'https://www.nejm.org/doi/full/10.1056/NEJMoa2102953'},
+  holliday:  {t:'Holliday MA, Segar WE. "The maintenance need for water in parenteral fluid therapy" (Holliday-Segar formülü)', p:'Pediatrics 1957;19(5):823-832', y:'1957', u:'https://pubmed.ncbi.nlm.nih.gov/13431307/'},
+  hollidayaap:{t:'Holliday-Segar orijinal makalesi (tam metin)', p:'American Academy of Pediatrics — Pediatrics', y:'1957', u:'https://publications.aap.org/pediatrics/article/19/5/823/29135/THE-MAINTENANCE-NEED-FOR-WATER-IN-PARENTERAL-FLUID'}
+};
+
+/* Türkçe karakterleri de doğru eşleştiren basit normalizasyon */
+function srcNorm(s){
+  return (s||'').toString().replace(/İ/g,'i').replace(/I/g,'ı').replace(/Ş/g,'ş').replace(/Ğ/g,'ğ').replace(/Ü/g,'ü').replace(/Ö/g,'ö').replace(/Ç/g,'ç').toLowerCase();
+}
+function srcEsc(s){
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* Tek bir kaynağın <li> satırı */
+function srcItem(k){
+  const s = SOURCES[k];
+  if(!s) return '';
+  return `<li><a class="src-link" href="${srcUrl(s.u)}" target="_blank" rel="noopener noreferrer">${srcEsc(s.t)}</a> — ${srcEsc(s.p)}${s.y? ' ('+srcEsc(s.y)+')' : ''}</li>`;
+}
+/* Serbest metinli/dinamik kaynak satırı */
+function srcUrl(u){ return (u||'').toString().replace(/&/g,'&amp;'); }
+function srcCustom(text, url){
+  return `<li><a class="src-link" href="${srcUrl(url)}" target="_blank" rel="noopener noreferrer">${srcEsc(text)}</a></li>`;
+}
+
+/* Ekranların altına yerleştirilen kaynak kutusu */
+function sourceBox(keys, extraHtml, title){
+  const list = (keys||[]).map(srcItem).join('');
+  const extra = extraHtml || '';
+  if(!list && !extra) return '';
+  return `<div class="src-box">
+    <div class="src-head">📚 ${srcEsc(title || 'Bu içeriğin kaynakları')}</div>
+    <ul>${list}${extra}</ul>
+    <div class="src-updated">Kaynaklar son olarak ${SOURCES_LAST_REVIEW} tarihinde kontrol edilmiştir. Tüm kaynakların tam listesi için <span class="src-inline" onclick="goto('sources')">Kaynaklar sayfasına</span> bakınız.</div>
+  </div>`;
+}
+
+/* ---- Konuya göre kaynak eşleştirme (hastalık/bakım başlıkları) ---- */
+const TOPIC_SOURCES = [
+  {kw:['sepsis','septik','sirs'], keys:['ssc','sb','statpearls']},
+  {kw:['arrest','resüsitasyon','resusitasyon','cpr','kardiyopulmoner','defibril'], keys:['erc','ahacpr','sb']},
+  {kw:['koah'], keys:['gold','ttd','sb']},
+  {kw:['astım','astim'], keys:['gina','ttd','sb']},
+  {kw:['diyabet','ketoasidoz','dka','hiperglisemi','hhs','hipoglisemi','insülin'], keys:['ada','sb','statpearls']},
+  {kw:['kalp yetmezliği','dekompansasyon','kardiyojenik'], keys:['esc','tkd','sb']},
+  {kw:['stemi','nstemi','miyokard','angina','anjina','koroner','anjiyografi'], keys:['esc','tkd','aha']},
+  {kw:['atriyal fibrilasyon','taşikardi','bradikardi','aritmi','flutter','ventriküler'], keys:['esc','tkd','statpearls']},
+  {kw:['hipertansi'], keys:['esc','tkd','nice']},
+  {kw:['inme','svo','serebrovasküler','subaraknoid','intraserebral','hemoraji'], keys:['aha','esc','statpearls']},
+  {kw:['böbrek','renal','diyaliz','nefro','üremi','glomerül'], keys:['kdigo','statpearls','sb']},
+  {kw:['pnömoni','ards','solunum yetmezliği','akciğer','plevra','pnömotoraks','ampiyem','tüberküloz','atelektazi','mekanik ventil'], keys:['ttd','nice','statpearls']},
+  {kw:['enfeksiyon','antibiyo','üse','üriner sistem','menenjit','selülit','kateter enf','hastane enf'], keys:['cdc','whoipc','sb']},
+  {kw:['gebelik','doğum','preeklampsi','eklampsi','postpartum','sezaryen'], keys:['who','nice','sb']},
+  {kw:['yenidoğan','neonatal','prematür','rds','hiperbilirubinemi','nec','pda','ivh','bebek'], keys:['who','statpearls','nice']},
+  {kw:['kanser','onkoloj','kemoterapi','nötropen','tümör','metastaz','radyoterapi'], keys:['nice','statpearls','who']},
+  {kw:['anafilaksi','alerji','alerjik'], keys:['erc','statpearls','who']},
+  {kw:['hiponatremi','hipernatremi','hiperkalemi','hipokalemi','kalsiyum','magnezyum','elektrolit','asidoz','alkaloz'], keys:['statpearls','msd','sb']},
+  {kw:['tromboz','emboli','dvt','antikoagül','pıhtı'], keys:['esc','nice','statpearls']},
+  {kw:['deliryum','demans','psikiyatr','depresyon','anksiyete','şizofren','bipolar','intihar'], keys:['nice','who','sb']},
+  {kw:['epilepsi','nöbet','status epileptikus','konvülz'], keys:['nice','statpearls','sb']},
+  {kw:['travma','kırık','kompartman','yanık','politravma','amputasyon','luksasyon'], keys:['nice','statpearls','sb']},
+  {kw:['bası yara','basınç yara','dekübit','yara bakımı','ülser'], keys:['nice','whoipc','statpearls']},
+  {kw:['hepat','karaciğer','siroz','pankreat','gastrointestinal','kanama','kolesistit','apandisit','ileus','peritonit','anastomoz'], keys:['nice','statpearls','msd']},
+  {kw:['tiroid','endokrin','adrenal','feokromositoma','hipofiz'], keys:['statpearls','msd','sb']},
+  {kw:['anemi','hematoloj','trombositopeni','lösemi','lenfoma','transfüzyon','koagülasyon','kan ürün'], keys:['who','nice','statpearls']},
+  {kw:['nakil','transplant','rejeksiyon','immünsüpres'], keys:['kdigo','nice','statpearls']},
+  {kw:['palyatif','ağrı','terminal','yaşam sonu'], keys:['who','nice','sb']},
+  {kw:['göz','katarakt','glokom','retina'], keys:['nice','statpearls','msd']},
+  {kw:['kulak','burun','boğaz','tonsil','sinüzit','işitme'], keys:['nice','statpearls','msd']},
+  {kw:['deri','dermat','egzama','psöriaz','döküntü'], keys:['nice','statpearls','msd']},
+  {kw:['diş','ağız','periodont','çürük'], keys:['who','nice','sb']},
+  {kw:['rehabilitasyon','fizyoterapi','mobilizasyon','egzersiz'], keys:['who','nice','sb']}
+];
+const TOPIC_SOURCES_DEFAULT = ['sb','msd','statpearls','medlineplus'];
+
+function topicSourceKeys(text){
+  const t = srcNorm(text);
+  const hit = TOPIC_SOURCES.find(x=> x.kw.some(k=> t.indexOf(k) >= 0));
+  const keys = hit ? hit.keys.slice() : TOPIC_SOURCES_DEFAULT.slice();
+  if(keys.indexOf('sb') < 0) keys.push('sb');
+  return keys;
+}
+/* Hastalık/bakım kartı içine gömülen kaynak kutusu */
+function topicSourceBox(title, extraText){
+  return sourceBox(topicSourceKeys(title + ' ' + (extraText||'')), '', 'Bu başlığın kaynakları');
+}
+
+/* ---- İlaç kartları için kaynak kutusu ---- */
+function drugSourceBox(generic, tradeName, isHighRisk, isLasa){
+  const base = (generic || tradeName || '').toString().split('(')[0].replace(/[^A-Za-zÇĞİÖŞÜçğıöşü0-9 \-]/g,' ').trim();
+  const q = encodeURIComponent(base);
+  let extra = '';
+  extra += srcCustom('TİTCK Kısa Ürün Bilgisi (KÜB) / Kullanma Talimatı arşivi — Türkiye\'deki resmî ürün bilgisi (ürün adıyla arayın)', 'https://www.titck.gov.tr/kubkt');
+  if(base){
+    extra += srcCustom('DailyMed\'de "' + base + '" için resmî FDA ilaç prospektüsünü görüntüle', 'https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=' + q);
+  } else {
+    extra += srcItem('dailymed');
+  }
+  extra += srcItem('medlineplus');
+  extra += srcItem('msd');
+  if(isHighRisk) extra += srcItem('ismphigh');
+  if(isLasa) extra += srcItem('ismp');
+  return sourceBox([], extra, 'Bu ilaç bilgisinin kaynakları');
+}
+
+/* ============ KAYNAKLAR SAYFASI ============ */
+const SOURCE_GROUPS = [
+  {title:'🇹🇷 Ulusal Resmî Kaynaklar', keys:['sb','titck','tkd','ttd'],
+   note:'Türkiye\'de geçerli resmî ilaç bilgisi, ruhsat ve tedavi kılavuzları için birincil başvuru kaynaklarıdır.'},
+  {title:'🌍 Uluslararası Kurumsal Kaynaklar', keys:['who','cdc','fda','nice'],
+   note:'Uygulamadaki genel klinik yaklaşım, enfeksiyon kontrolü ve halk sağlığı bilgilerinin dayandığı kurumsal kaynaklar.'},
+  {title:'💊 İlaç Bilgisi ve İlaç Güvenliği', keys:['titck','dailymed','medlineplus','msd','ismphigh','ismp'],
+   note:'İlaç dozları, endikasyon, kontrendikasyon, yan etki ve etkileşim bilgileri bu kaynaklardaki resmî ürün bilgilerine dayanır. Yüksek riskli ilaç ve LASA (birbirine benzeyen isim) işaretlemeleri ISMP listelerinden alınmıştır.'},
+  {title:'🫀 Klinik Uygulama Kılavuzları', keys:['esc','aha','ahacpr','erc','ssc','kdigo','ada','gold','gina','niceiv'],
+   note:'Hastalık başlıklarındaki tanı, tedavi ve izlem yaklaşımları ilgili uzmanlık derneklerinin güncel kılavuzlarına dayandırılmıştır.'},
+  {title:'🧮 Hesaplama Araçlarının Kaynak Yayınları', keys:['ckdepi','holliday','hollidayaap','whoobesity'],
+   note:'Uygulamadaki her hesaplayıcı, aşağıdaki orijinal yayınlarda tanımlanan formülleri kullanır.'},
+  {title:'📚 Hakemli Literatür ve Başvuru Metinleri', keys:['statpearls','pubmed','medlinelab','msd'],
+   note:'Tanım, patofizyoloji, laboratuvar değerleri ve genel klinik bilgiler için kullanılan hakemli başvuru kaynakları.'},
+  {title:'🩺 Hemşirelik Sınıflamaları ve Enfeksiyon Kontrolü', keys:['nanda','whoipc','cdc'],
+   note:'Hemşirelik tanıları NANDA-I sınıflamasına; el hijyeni ve enfeksiyon kontrol uygulamaları WHO ve CDC önerilerine dayanır.'}
+];
+
+function viewSources(){
+  const groups = SOURCE_GROUPS.map(g=>`
+    <div class="section-title">${g.title}</div>
+    <div class="card">
+      <div class="field-val" style="margin-bottom:8px;">${g.note}</div>
+      <ul class="src-list">${g.keys.map(srcItem).join('')}</ul>
+    </div>`).join('');
+
+  return `
+  <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>Kaynaklar</h1></div>
+
+  <div class="disclaimer">⚠️ Klinik Rehber Pro yalnızca eğitim ve bilgi amaçlı bir referans uygulamasıdır. Tıbbi tavsiye, tanı veya tedavi yerine geçmez. Uygulamadaki tüm tıbbi bilgiler aşağıdaki kaynaklardan derlenmiştir; klinik kararlar hastanın tam değerlendirmesi, kurum protokolleri ve ilgili hekimin/uzmanın görüşü doğrultusunda verilmelidir.</div>
+
+  <div class="card">
+    <div class="card-title">Bu sayfa nedir?</div>
+    <div class="field-val" style="margin-top:6px;">
+      Uygulamada yer alan hastalık bilgileri, ilaç dozları, hesaplayıcılar, laboratuvar referans aralıkları ve bakım protokolleri;
+      resmî kurum kılavuzları, uzmanlık dernekleri kılavuzları ve hakemli tıbbi literatürden derlenmiştir.
+      Aşağıdaki bağlantılar sizi doğrudan ilgili kaynağın resmî sayfasına götürür.
+      Ayrıca uygulamadaki her tıbbi içerik ekranının altında, o ekrana özel kaynak listesini bulabilirsiniz.
+    </div>
+    <div class="src-updated" style="text-align:left;">Kaynak bağlantıları son olarak ${SOURCES_LAST_REVIEW} tarihinde kontrol edilmiştir.</div>
+  </div>
+
+  ${groups}
+
+  <div class="section-title">Kaynak Kullanımı Hakkında</div>
+  <div class="card">
+    <div class="field-val">
+      • İlaç dozları ve uygulama bilgileri, ilgili ürünün <b>güncel Kısa Ürün Bilgisi (KÜB)</b> ile doğrulanmalıdır; ürün bilgileri zaman içinde değişebilir.<br/>
+      • Kılavuzlar düzenli olarak güncellenir. Uygulamadaki bilgiyle kaynaktaki güncel bilgi arasında fark görürseniz <b>kaynak esas alınmalıdır</b>.<br/>
+      • Uygulamada Lexicomp, Micromedex, UpToDate gibi abonelik gerektiren ticari veritabanlarının içeriği <b>kopyalanmamıştır</b>; etkileşim şiddet sınıflandırması bu tür referanslarda kullanılan standart 4 kademeli yapıyı temel alır.<br/>
+      • Hatalı veya güncelliğini yitirmiş bir bilgi fark ederseniz lütfen bize bildirin; içerik gözden geçirilerek güncellenir.
+    </div>
+  </div>
+
+  <div class="pdf-note" style="margin-top:16px;">Bu uygulama tıbbi cihaz değildir ve tanı koymak, tedavi belirlemek veya hasta yönetimi hakkında karar vermek amacıyla kullanılamaz.</div>
+  `;
+}
 
 const CLINICS_ALL = [
   {id:'dahiliye', name:'Dahiliye Servisi', em:'🩺', ready:true},
@@ -6475,6 +6716,7 @@ function renderTopbar(){
   <div class="topbar">
     <div class="topbar-row">
       <div class="brand"><span class="dot"></span>Klinik Rehber Pro</div>
+      <button class="icon-btn" onclick="goto('sources')" title="Kaynaklar">📚</button>
       <button class="icon-btn" onclick="goto('settings')" title="Ayarlar">⚙️</button>
       <button class="icon-btn" onclick="toggleDark()">${state.dark?'☀️':'🌙'}</button>
     </div>
@@ -6534,6 +6776,7 @@ function viewHome(){
   const banner = upcoming.length? `<div class="notif-banner">🔔 ${upcoming.map(u=>`${formatDateLabelTR(u.dateStr)} (${u.label}) vardiyanız ${Math.round(u.hoursLeft)} saat sonra`).join(' · ')}</div>` : '';
   return `
   <div class="disclaimer">⚠️ ${DISCLAIMER}</div>
+  <div class="src-banner">📚 Uygulamadaki tüm tıbbi bilgiler resmî kurum kılavuzları, uzmanlık dernekleri kılavuzları ve hakemli tıbbi literatürden derlenmiştir. Her içerik ekranının altında o içeriğe ait kaynak bağlantılarını bulabilirsiniz. <span class="src-inline" onclick="goto('sources')">Tüm kaynakları görüntüle →</span></div>
   ${banner}
   <div class="section-title">🚑 Acil Sağlık Hizmetleri</div>
   <div class="grid2">
@@ -6555,6 +6798,7 @@ function viewHome(){
     <div class="clinic-card" onclick="goto('fluids')"><div class="em">💧</div><div class="t">Mayi / İnfüzyon Rehberi</div></div>
     <div class="clinic-card" onclick="goto('abbrev')"><div class="em">🔤</div><div class="t">Kısaltmalar</div></div>
     <div class="clinic-card" onclick="goto('calc')"><div class="em">🧮</div><div class="t">Hesaplamalar</div></div>
+    <div class="clinic-card" onclick="goto('sources')"><div class="em">📚</div><div class="t">Kaynaklar ve Referanslar</div></div>
   </div>
   <div class="section-title">Klinikler</div>
   <div class="grid2">
@@ -6596,13 +6840,16 @@ function viewClinic(){
       <div class="section-title">Hemşirenin Görevi</div>
       <div class="card"><div class="field-val">${c.intro.role}</div></div>
       <div class="pdf-note">📄 Bu sayfayı PDF olarak dışa aktarmak için tarayıcının "Yazdır → PDF olarak kaydet" seçeneğini kullanabilirsiniz.</div>
+      ${sourceBox(['sb','who','msd','statpearls'],'','Klinik tanıtımının kaynakları')}
     `;
   } else if(state.tab==='akis'){
     const w = c.workflow;
     const block = (label, arr)=>`<div class="card"><div class="card-title">${label}</div><div class="field-val">${arr.map(x=>'• '+x).join('<br/>')}</div></div>`;
-    body = block('🌅 Sabah', w.morning)+block('☀️ Öğle', w.noon)+block('🌇 Akşam', w.evening)+block('🌙 Gece', w.night)+block('🔄 Vardiya Teslimi', w.handover);
+    body = block('🌅 Sabah', w.morning)+block('☀️ Öğle', w.noon)+block('🌇 Akşam', w.evening)+block('🌙 Gece', w.night)+block('🔄 Vardiya Teslimi', w.handover)
+      + sourceBox(['sb','who','whoipc','nice'],'','İş akışı ve hasta güvenliği kaynakları');
   } else if(state.tab==='kabul'){
-    body = `<div class="card"><div class="card-title">Hasta Kabul Adımları</div><div class="field-val">${c.admission.steps.map(x=>'✓ '+x).join('<br/>')}</div></div>`;
+    body = `<div class="card"><div class="card-title">Hasta Kabul Adımları</div><div class="field-val">${c.admission.steps.map(x=>'✓ '+x).join('<br/>')}</div></div>`
+      + sourceBox(['who','sb','whoipc','nice'],'','Hasta kabulü ve kimlik doğrulama kaynakları');
   } else if(state.tab==='hastaliklar'){
     body = c.diseases.map((d,i)=>{
       const key = 'disease:'+state.clinicId+':'+i;
@@ -6620,6 +6867,7 @@ function viewClinic(){
           <div class="field"><div class="field-label">Hemşirelik Yaklaşımı</div><div class="field-val">${d.nursing}</div></div>
           <div class="field"><div class="field-label">Takip</div><div class="field-val">${d.followup}</div></div>
           <div class="field"><div class="field-label">Komplikasyonlar</div><div class="field-val">${d.complications}</div></div>
+          ${open? topicSourceBox(d.title, d.def) : ''}
         </div>
       </div>`;
     }).join('');
@@ -6654,6 +6902,7 @@ function viewClinic(){
           <div class="field"><div class="field-label">Monitorizasyon</div><div class="field-val">${d.monitoring}</div></div>
           <div class="field"><div class="field-label">Saklama Koşulları</div><div class="field-val">${d.storage}</div></div>
           <div class="field"><div class="field-label">İlaç Etkileşimleri</div><div class="field-val">${d.interactions}</div></div>
+          ${open? drugSourceBox(d.generic, d.title, d.highRisk, d.lasa) : ''}
         </div>
       </div>`;
     }).join('');
@@ -6662,7 +6911,9 @@ function viewClinic(){
       <div class="list-row" style="display:block;padding:10px 0;">
         <div style="display:flex;justify-content:space-between;"><span class="name">${l.name}</span><span class="val">${l.range}</span></div>
         <div class="field-val" style="margin-top:4px;"><b style="color:var(--red)">Yüksek:</b> ${l.high}<br/><b style="color:var(--blue-700)">Düşük:</b> ${l.low}<br/><span style="color:var(--ink-2)">${l.role}</span></div>
-      </div>`).join('<hr style="border:none;border-top:1px dashed var(--line)"/>') + `</div>`;
+      </div>`).join('<hr style="border:none;border-top:1px dashed var(--line)"/>') + `</div>`
+      + sourceBox(['medlinelab','msd','statpearls','sb'],'','Laboratuvar referans aralıklarının kaynakları')
+      + `<div class="pdf-note">⚠️ Referans aralıkları laboratuvarın kullandığı yönteme ve cihaza göre değişir; sonucu daima kendi laboratuvarınızın referans aralığıyla değerlendirin.</div>`;
   } else if(state.tab==='bakimlar'){
     body = c.cares.map(care=>`<div class="${tagClass(care.color)}">
         <div class="card-title">${care.title}</div>
@@ -6671,13 +6922,15 @@ function viewClinic(){
         <div class="field"><div class="field-label">Sıklığı</div><div class="field-val">${care.freq}</div></div>
         <div class="field"><div class="field-label">Komplikasyonlar</div><div class="field-val">${care.complications}</div></div>
         <div class="field"><div class="field-label">Dikkat Edilmesi Gerekenler</div><div class="field-val">${care.notes}</div></div>
+        ${topicSourceBox(care.title, care.notes)}
       </div>`).join('');
   } else if(state.tab==='protokoller'){
-    body = c.protocols.map(p=>`<div class="card"><div class="card-title">${p.title}</div><div class="field-val">${p.items.map(i=>'☐ '+i).join('<br/>')}</div></div>`).join('');
+    body = c.protocols.map(p=>`<div class="card"><div class="card-title">${p.title}</div><div class="field-val">${p.items.map(i=>'☐ '+i).join('<br/>')}</div>${topicSourceBox(p.title, (p.items||[]).join(' '))}</div>`).join('');
   } else if(state.tab==='nanda'){
     body = c.nanda.map(n=>`<div class="card"><div class="card-title">${n.dx}</div>
       <div class="field"><div class="field-label">İlişkili Faktör</div><div class="field-val">${n.related}</div></div>
-      <div class="field"><div class="field-label">Beklenen Sonuç (NOC)</div><div class="field-val">${n.outcome}</div></div></div>`).join('');
+      <div class="field"><div class="field-label">Beklenen Sonuç (NOC)</div><div class="field-val">${n.outcome}</div></div></div>`).join('')
+      + sourceBox(['nanda','sb','statpearls'],'','Hemşirelik tanılarının kaynakları');
   }
   return `
     <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>${c.name}</h1></div>
@@ -6700,6 +6953,7 @@ function viewAbbrev(){
   <div class="backbar"><h1>Kısaltmalar Sözlüğü</h1></div>
   <input class="searchbox" style="margin-bottom:10px;" placeholder="Kısaltma ara (örn. PEEP)" value="${esc(state.searchTerm)}" oninput="onAbbrevSearch(this.value)"/>
   <div class="card" id="abbrev-results-wrap">${renderAbbrevResultsHTML()}</div>
+  ${sourceBox(['sb','msd','statpearls','who'],'','Kısaltmaların kaynakları')}
   `;
 }
 function onAbbrevSearch(v){
@@ -6711,12 +6965,15 @@ function onAbbrevSearch(v){
 function viewCalc(){
   return `
   <div class="backbar"><h1>Hesaplamalar</h1></div>
+  <div class="src-banner">📚 Aşağıdaki hesaplayıcıların her biri, altında bağlantısı verilen yayımlanmış formül ve kılavuzlara dayanmaktadır. Sonuçlar yaklaşık değerlerdir ve klinik kararın yerine geçmez.</div>
 
   <div class="calc-card">
     <div class="calc-title">🧮 Vücut Kitle İndeksi (BMI)</div>
     <div class="calc-row"><label>Kilo (kg)</label><input type="number" id="bmi_w" oninput="calcBMI()"/></div>
     <div class="calc-row"><label>Boy (cm)</label><input type="number" id="bmi_h" oninput="calcBMI()"/></div>
     <div class="calc-result" id="bmi_res">Sonuç için değerleri girin.</div>
+    <div class="pdf-note" style="text-align:left;">Formül: BMI = kilo (kg) / boy² (m). Sınıflandırma WHO erişkin BMI eşiklerine göredir (&lt;18.5 zayıf, 18.5-24.9 normal, 25-29.9 fazla kilolu, ≥30 obez).</div>
+    ${sourceBox(['whoobesity','cdc'],'','Bu hesaplayıcının kaynakları')}
   </div>
 
   <div class="calc-card">
@@ -6725,6 +6982,8 @@ function viewCalc(){
     <div class="calc-row"><label>Süre (saat)</label><input type="number" id="dr_t" oninput="calcDrip()"/></div>
     <div class="calc-row"><label>Damla Faktörü (gtt/ml)</label><input type="number" id="dr_f" value="20" oninput="calcDrip()"/></div>
     <div class="calc-result" id="dr_res">Sonuç için değerleri girin.</div>
+    <div class="pdf-note" style="text-align:left;">Formül: damla/dk = (toplam hacim [ml] × damla faktörü [gtt/ml]) / (süre [saat] × 60). Damla faktörü kullanılan setin ambalajında yazar (makro set genellikle 20 gtt/ml, mikro set 60 gtt/ml).</div>
+    ${sourceBox(['niceiv','msd','statpearls'],'','Bu hesaplayıcının kaynakları')}
   </div>
 
   <div class="calc-card">
@@ -6734,6 +6993,8 @@ function viewCalc(){
     <div class="calc-row"><label>Flakon Konsantrasyonu (mg / toplam ml)</label><input type="number" id="inf_c" placeholder="mg" oninput="calcInfusion()"/></div>
     <div class="calc-row"><label>Toplam Solüsyon Hacmi (ml)</label><input type="number" id="inf_vol" oninput="calcInfusion()"/></div>
     <div class="calc-result" id="inf_res">Örn: Noradrenalin 4 mg / 50 ml SF için "Flakon: 4", "Hacim: 50" girin.</div>
+    <div class="pdf-note" style="text-align:left;">Formül: ml/saat = (doz [mcg/kg/dk] × ağırlık [kg] × 60) / konsantrasyon [mcg/ml]; konsantrasyon = (ilaç miktarı [mg] × 1000) / toplam hacim [ml]. Sonuç mutlaka ikinci bir sağlık çalışanı tarafından bağımsız olarak kontrol edilmelidir.</div>
+    ${sourceBox(['ismphigh','ismp','msd','titck'],'','Bu hesaplayıcının kaynakları')}
   </div>
 
   <div class="calc-card">
@@ -6746,13 +7007,16 @@ function viewCalc(){
       </select>
     </div>
     <div class="calc-result" id="gfr_res">Sonuç için değerleri girin.</div>
-    <div class="pdf-note">Yaklaşık değerdir; kesin klinik karar için laboratuvar/kılavuz hesaplayıcısı kullanılmalıdır.</div>
+    <div class="pdf-note" style="text-align:left;">Kullanılan denklem: <b>CKD-EPI 2021 (ırk değişkeni içermeyen kreatinin tabanlı denklem)</b>. Evreleme KDIGO KBH sınıflandırmasına göredir. Yaklaşık değerdir; kesin klinik karar için laboratuvarınızın raporladığı eGFR ve kılavuz hesaplayıcıları esas alınmalıdır.</div>
+    ${sourceBox(['ckdepi','kdigo'],'','Bu hesaplayıcının kaynakları')}
   </div>
 
   <div class="calc-card">
     <div class="calc-title">🧒 Günlük Sıvı İhtiyacı (Holliday-Segar)</div>
     <div class="calc-row"><label>Kilo (kg)</label><input type="number" id="fluid_w" oninput="calcFluid()"/></div>
     <div class="calc-result" id="fluid_res">Sonuç için kilo girin.</div>
+    <div class="pdf-note" style="text-align:left;">Holliday-Segar (4-2-1) kuralı: ilk 10 kg için 100 ml/kg/gün, 10-20 kg arası ek 50 ml/kg/gün, 20 kg üzeri ek 20 ml/kg/gün. İdame ihtiyacını verir; dehidratasyon açığı, devam eden kayıplar ve klinik durum ayrıca değerlendirilmelidir.</div>
+    ${sourceBox(['holliday','hollidayaap','niceiv'],'','Bu hesaplayıcının kaynakları')}
   </div>
   `;
 }
@@ -6816,6 +7080,7 @@ function viewVitals(){
     </div>`).join('')}
   <div class="section-title">Kritik Değer Eşikleri (Erişkin)</div>
   <div class="card">${VITALS_CRITICAL.map(x=>`<div class="list-row"><span class="name">${x.name}</span><span class="val" style="text-align:right;max-width:60%;">${x.val}</span></div>`).join('')}</div>
+  ${sourceBox(['sb','who','nice','msd','statpearls'],'','Vital bulgu referanslarının kaynakları')}
   `;
 }
 
@@ -6842,6 +7107,8 @@ function viewFluids(){
       <div class="field"><div class="field-label">Monitorizasyon</div><div class="field-val">${f.monitoring}</div></div>
     </div>`).join('')}
   <div class="pdf-note">💡 mcg/kg/dk → ml/saat dönüşümü için Hesaplamalar sekmesindeki "İnfüzyon Hızı" aracını kullanabilirsiniz.</div>
+  ${sourceBox(['niceiv','titck','ismphigh','msd','statpearls'],'','Mayi ve infüzyon bilgilerinin kaynakları')}
+  <div class="pdf-note">⚠️ Hazırlama konsantrasyonları ve doz aralıkları kurumdan kuruma değişebilir. Uygulamadan önce ürünün güncel Kısa Ürün Bilgisi'ni (KÜB) ve kurumunuzun ilaç hazırlama protokolünü mutlaka kontrol edin.</div>
   `;
 }
 
@@ -7033,6 +7300,7 @@ function renderMedGuideResultsHTML(){
           <div class="field"><div class="field-label">Hemşirelik Notu</div><div class="field-val">${m.note}</div></div>
           <div class="field-label" style="margin-top:6px;">Kişisel Notunuz</div>
           <textarea class="note-textarea" id="${noteId}" placeholder="Bu ilaç için kendi notunuzu yazın..." onblur="setMedNote('${m.n.replace(/'/g,"\\'")}')">${noteVal}</textarea>
+          ${open? drugSourceBox(m.g, m.n, m.risk, m.lasa) : ''}
         </div>
       </div>`;
   }).join('');
@@ -7043,7 +7311,10 @@ function viewMedGuide(){
   return `
   <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>İlaç Rehberi</h1></div>
   <input class="searchbox" style="margin-bottom:10px;" placeholder="Ticari ad, etken madde veya grup ara..." value="${esc(state.medSearch)}" oninput="onMedSearch(this.value)"/>
+  <div class="src-banner">📚 İlaç bilgileri TİTCK Kısa Ürün Bilgisi (KÜB), FDA/DailyMed resmî prospektüsleri ve MedlinePlus verilerinden derlenmiştir. Her ilaç kartını açtığınızda, o ilaca ait kaynak bağlantılarını kartın altında bulabilirsiniz. <span class="src-inline" onclick="goto('sources')">Tüm kaynaklar →</span></div>
   <div id="medguide-results-wrap">${renderMedGuideResultsHTML()}</div>
+  ${sourceBox(['titck','dailymed','medlineplus','ismphigh','ismp','msd'],'','İlaç rehberinin genel kaynakları')}
+  <div class="pdf-note">⚠️ İlaç dozları hasta yaşı, kilosu, böbrek/karaciğer fonksiyonu ve eşlik eden hastalıklara göre değişir. Uygulamadan önce ürünün güncel KÜB'ünü ve hekim istemini doğrulayın.</div>
   `;
 }
 
@@ -7167,6 +7438,7 @@ function viewInteractions(){
   <div class="section-title" style="margin-top:16px;">İlaç Seç</div>
   <input class="searchbox" style="margin-bottom:10px;" placeholder="İlaç ara (ticari veya etken madde adı)..." value="${esc(state.medSearch)}" oninput="onMedSearch(this.value)"/>
   <div id="interactions-med-list-wrap">${renderInteractionsMedListHTML()}</div>
+  ${sourceBox(['titck','dailymed','fda','ismp','msd'],'','Etkileşim bilgilerinin kaynakları')}
   <div class="pdf-note" style="margin-top:14px;">⚠️ Bu araç, klinik farmakoloji referanslarındaki (Lexicomp/Micromedex/DrugBank tarzı) standart 4 kademeli şiddet sınıflandırmasını (Kontrendike/Majör/Orta/Minör) temel alan, elle doğrulanmış sınırlı bir veritabanı kullanır. Kapsamı sınırlıdır; kesin klinik karar için güncel bir ilaç etkileşim veritabanı (örn. hastane eczanesi sistemi) ve eczacı/hekim değerlendirmesi esastır.</div>
   `;
 }
@@ -7201,6 +7473,7 @@ function viewECG(){
     </div>`;
   }).join('')}
   <div class="pdf-note">Şeritler gerçek hasta verisi değil, öğretici amaçlı şematik çizimlerdir.</div>
+  ${sourceBox(['esc','aha','ahacpr','erc','statpearls'],'','EKG içeriğinin kaynakları')}
   `;
 }
 
@@ -7285,6 +7558,8 @@ function viewABG(){
     <div class="list-row"><span class="name">PaO2</span><span class="val">80-100 mmHg</span></div>
     <div class="list-row"><span class="name">Anyon Açığı</span><span class="val">8-12 mEq/L</span></div>
   </div>
+  <div class="pdf-note" style="text-align:left;">Kullanılan kurallar: birincil bozukluk pH, PaCO2 ve HCO3 yönlerine göre belirlenir; anyon açığı = Na − (Cl + HCO3) (normal 8-12 mEq/L); P/F oranı = PaO2 / (FiO2/100) ve ARDS şiddet sınıflaması Berlin tanımına göredir.</div>
+  ${sourceBox(['statpearls','msd','ttd','nice'],'','Kan gazı yorumlamasının kaynakları')}
   <div class="pdf-note">Bu araç öğretici/yardımcı bir hesaplayıcıdır; klinik karar hastanın tüm tablosu ve hekim değerlendirmesiyle verilmelidir.</div>
   `;
 }
@@ -7295,15 +7570,16 @@ function viewSettings(){
   return `
   <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>Ayarlar</h1></div>
 
+  ${PREMIUM_IAP_ENABLED? `
   <div class="section-title">⭐ Üyelik</div>
   <div class="card" style="margin-bottom:14px;">
     <div class="card-title">${state.premium? '✅ Premium Aktif' : 'Ücretsiz Sürüm'}</div>
     <div class="field-val" style="margin-top:6px;">${state.premium? 'Premium üyeliğiniz aktif; reklam görmüyorsunuz.' : 'Premium üyelikle tüm reklamlar (geçiş, ödüllü) tamamen kapanır.'}</div>
-  </div>
+  </div>` : ''}
 
   <div class="section-title">ℹ️ Reklam Durumu</div>
   <div class="card">
-    <div class="list-row"><span class="name">Reklam Durumu</span><span class="val">${(!isNative)? 'Devre dışı (tarayıcı)' : (state.premium? 'Devre dışı (Premium)' : (state.adEnabled? 'Etkin' : 'Devre dışı'))}</span></div>
+    <div class="list-row"><span class="name">Reklam Durumu</span><span class="val">${(!isNative)? 'Devre dışı (tarayıcı)' : (state.premium? (PREMIUM_IAP_ENABLED? 'Devre dışı (Premium)' : 'Devre dışı') : (state.adEnabled? 'Etkin' : 'Devre dışı'))}</span></div>
   </div>
   <div class="pdf-note">CPR/acil müdahale, ilaç dozu ve hesaplayıcı sayfalarında geçiş reklamı hiçbir zaman gösterilmez. Reklamlar yalnızca doğal sayfa geçişlerinde, en az 3 dakika arayla gösterilir.</div>
 
@@ -7313,6 +7589,12 @@ function viewSettings(){
     <div class="field-val">Avrupa Birliği/İngiltere/İsviçre'de bulunan kullanıcılar için reklam kişiselleştirme rızanızı istediğiniz zaman gözden geçirip değiştirebilirsiniz.</div>
     <button class="btn-outline" style="width:100%;margin-top:10px;" onclick="if(typeof window.showPrivacyOptionsForm==='function'){window.showPrivacyOptionsForm();}">Gizlilik Tercihlerini Yönet</button>
   </div>` : ''}
+
+  <div class="section-title" style="margin-top:20px;">📚 Kaynaklar</div>
+  <div class="card">
+    <div class="field-val">Uygulamadaki tıbbi bilgilerin dayandığı resmî kılavuz, kurum ve yayınların tam listesini görüntüleyebilirsiniz.</div>
+    <button class="btn-outline" style="width:100%;margin-top:10px;" onclick="goto('sources')">Kaynakları Görüntüle</button>
+  </div>
 
   <div class="section-title" style="margin-top:20px;">Uygulama Hakkında</div>
   <div class="card">
@@ -7375,6 +7657,7 @@ function render(){
   else if(state.view==='favorites') view = viewFavorites();
   else if(state.view==='notes') view = viewNotes();
   else if(state.view==='settings') view = viewSettings();
+  else if(state.view==='sources') view = viewSources();
   else view = viewHome();
 
   document.getElementById('app').innerHTML = `
