@@ -7827,6 +7827,68 @@ loadPersisted();
      tamamen zararsızdır ve sessizce devre dışı kalır.
      ============================================================ -->
 <script>
+/* Bağımsız blok: reklam veya satın alma eklentilerinden BAĞIMSIZ çalışır,
+   böylece o eklentiler yüklenmese bile kaynak bağlantıları açılır. */
+(function(){
+  var CAP = window.Capacitor || {};
+  /* ============================================================
+     HARİCİ BAĞLANTI AÇICI
+     ------------------------------------------------------------
+     SORUN: Capacitor WebView'inde <a target="_blank"> beklendiği
+     gibi çalışmaz.
+       • iOS (WKWebView): target="_blank" için bir pencere
+         oluşturucu tanımlı olmadığından bağlantı HİÇ AÇILMAZ.
+       • Android: bağlantı aynı WebView'de açılabilir; bu durumda
+         tek sayfalık uygulama ekrandan kaybolur ve geri dönüş
+         yolu olmadığı için uygulama DONMUŞ gibi görünür.
+       • Bazı durumlarda harici tarayıcı açılıp anında kapanır.
+
+     ÇÖZÜM: Tüm http/https bağlantılarını yakalayıp sistemin
+     uygulama içi tarayıcısında açmak (iOS'ta SFSafariViewController,
+     Android'de Chrome Custom Tabs). Böylece sayfa uygulamanın
+     üstünde açılır, "Bitti" ile kapatılır ve uygulama arka planda
+     olduğu yerde kalır.
+     ============================================================ */
+  var BrowserPlugin = (CAP.Plugins || {}).Browser;
+
+  window.openExternalUrl = function(url){
+    if (!url) return;
+    /* Yalnızca http/https adreslerine izin ver. */
+    if (!/^https?:\/\//i.test(url)) return;
+    if (BrowserPlugin && BrowserPlugin.open) {
+      BrowserPlugin.open({ url: url, presentationStyle: 'popover' }).catch(function(){
+        try { window.open(url, '_system'); } catch(e){}
+      });
+    } else {
+      try { window.open(url, '_blank'); } catch(e){}
+    }
+    try {
+      if (typeof window.__iapLogEvent === 'function') {
+        window.__iapLogEvent('external_link_opened', {});
+      }
+    } catch(e){}
+  };
+
+  /* Yakalama aşamasında dinleriz; böylece uygulamanın kendi
+     içeriği her yeniden çizildiğinde tekrar bağlamaya gerek kalmaz. */
+  document.addEventListener('click', function(ev){
+    var el = ev.target;
+    while (el && el !== document.body) {
+      if (el.tagName === 'A') {
+        var href = el.getAttribute('href') || '';
+        if (/^https?:\/\//i.test(href)) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          window.openExternalUrl(href);
+        }
+        return;
+      }
+      el = el.parentNode;
+    }
+  }, true);
+})();
+
+
 (function(){
   'use strict';
 
