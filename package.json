@@ -20,7 +20,6 @@
     "@capacitor/splash-screen": "^6.0.3",
     "@capacitor/status-bar": "^6.0.2",
     "@capacitor-community/admob": "^6.2.0",
-    "@capacitor-firebase/analytics": "^6.3.0",
     "cordova-plugin-purchase": "^13.17.2"
   },
   "devDependencies": {
