@@ -233,7 +233,7 @@ jobs:
         if: steps.signing-check.outputs.has_signing == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: hemsire-rehberi-pro-ipa
+          name: klinik-rehber-pro-ipa
           path: build/ipa/*.ipa
           if-no-files-found: error
           retention-days: 90
