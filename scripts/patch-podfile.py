@@ -61,7 +61,7 @@ PINNED_PODS = """
   """ + PIN_MARKER + """
   # UMP 3.x, Swift API isimlerini degistirdigi icin @capacitor-community/admob
   # ile uyumsuz. 2.x serisine sabitliyoruz. Ayrinti icin bu dosyanin basina bakin.
-  pod 'GoogleUserMessagingPlatform', '~> 2.0'
+  pod 'GoogleUserMessagingPlatform', '~> 3.1.0'
 """
 
 SIGNING_SNIPPET = """
