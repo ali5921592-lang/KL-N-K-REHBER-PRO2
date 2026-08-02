@@ -86,7 +86,7 @@ jobs:
       - name: CocoaPods bagimliliklarini da iceren senkronizasyon
         run: npx cap sync ios
 
-        - name: AdMob Swift düzeltmesi
+      - name: AdMob Swift düzeltmesi
         run: python3 scripts/patch-admob-swift.py
 
       - name: iOS projesini duzenle (Privacy Manifest, Info.plist, ekran yonleri)
