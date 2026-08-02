@@ -33,6 +33,36 @@ import sys
 PODFILE = os.path.join("ios", "App", "Podfile")
 
 MARKER = "# --- CI: Pod hedeflerinde kod imzalamayi kapat ---"
+PIN_MARKER = "# --- CI: Bagimlilik surum sabitleme ---"
+
+# ---------------------------------------------------------------------------
+# NEDEN SURUM SABITLEME GEREKLI?
+#
+# @capacitor-community/admob eklentisinin iOS kodu, Google'in User Messaging
+# Platform (UMP) SDK'sinin ESKI Swift isimlerini kullanir:
+#     UMPConsentInformation.sharedInstance   /   UMPConsentStatus
+#
+# Google, UMP 3.0.0 (24 Mart 2025) ile Swift API isimlerini degistirdi:
+#     ConsentInformation.shared              /   ConsentStatus
+#
+# Eklentinin podspec dosyasi UMP surumunu SABITLEMEDIGI icin CocoaPods her
+# derlemede en guncel surumu (3.x) ceker ve derleme su hatalarla coker:
+#     'sharedInstance' has been renamed to 'shared'
+#     'UMPConsentStatus' has been renamed to 'ConsentStatus'
+#
+# Bu, derlemenin "dun calisiyordu bugun calismiyor" davranisinin da
+# sebebidir: kodda hicbir sey degismese bile Google yeni surum yayinladiginda
+# derleme kirilir.
+#
+# COZUM: UMP'yi eklentinin destekledigi 2.x serisine sabitlemek.
+# '~> 2.0' ifadesi 2.x serisinin en guncel surumunu secer, 3.0'a gecmez.
+# ---------------------------------------------------------------------------
+PINNED_PODS = """
+  """ + PIN_MARKER + """
+  # UMP 3.x, Swift API isimlerini degistirdigi icin @capacitor-community/admob
+  # ile uyumsuz. 2.x serisine sabitliyoruz. Ayrinti icin bu dosyanin basina bakin.
+  pod 'GoogleUserMessagingPlatform', '~> 2.0'
+"""
 
 SIGNING_SNIPPET = """
   """ + MARKER + """
@@ -72,8 +102,29 @@ def main():
     with open(PODFILE, "r", encoding="utf-8") as f:
         content = f.read()
 
+    changed = False
+
+    # ---- 1) Bagimlilik surumlerini sabitle ----
+    if PIN_MARKER in content:
+        log("Surum sabitleme zaten mevcut, atlandi.")
+    else:
+        target_match = re.search(r"^target ['\"]App['\"] do\s*$", content, re.MULTILINE)
+        if target_match:
+            insert_at = target_match.end()
+            content = content[:insert_at] + "\n" + PINNED_PODS + content[insert_at:]
+            log("GoogleUserMessagingPlatform '~> 2.0' olarak sabitlendi "
+                "(UMP 3.x Swift API degisikligi nedeniyle).")
+            changed = True
+        else:
+            log("UYARI: \"target 'App' do\" blogu bulunamadi; surum sabitleme "
+                "eklenemedi. Podfile yapisi beklenenden farkli olabilir.")
+
+    # ---- 2) Kod imzalamayi kapat ----
     if MARKER in content:
-        log("Podfile zaten yamalanmis, tekrar islem yapilmadi.")
+        log("Imzalama yamasi zaten mevcut, atlandi.")
+        if changed:
+            with open(PODFILE, "w", encoding="utf-8") as f:
+                f.write(content)
         return 0
 
     # Capacitor'in var olan post_install blogunu bul.
