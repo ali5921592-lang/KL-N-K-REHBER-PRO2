@@ -1,96 +1,104 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 patch-podfile.py
+----------------
+Capacitor'in urettigi ios/App/Podfile dosyasina bir post_install kancasi
+ekler ve TUM Pod hedeflerinde kod imzalamayi kapatir.
 
-Amac: ios/App/Podfile dosyasina, Pods hedeflerinde (CocoaPods ile eklenen
-tum kutuphane target'larinda) kod imzalamayi devre disi birakan bir
-post_install hook'u ekler.
+NEDEN GEREKLI?
+CI ortamindaki imzalama kimligi yalnizca ana uygulama hedefi icin
+gecerlidir. CocoaPods ile gelen bagimliliklar (AdMob, Firebase,
+cordova-plugin-purchase gibi) ayri hedefler olarak derlenir ve Xcode
+bunlari da imzalamaya calisirsa arsivleme su hatayla coker:
 
-Neden gerekli: Manuel imzalama (Manual signing, Distribution certificate +
-provisioning profile) kullanildiginda, Xcode varsayilan olarak CocoaPods
-tarafindan olusturulan her bir Pods hedefini de (orn. Capacitor eklentileri,
-kutuphaneler) ayni sekilde imzalamaya calisir. Bu hedeflerin kendi
-provisioning profili olmadigi icin "no signing certificate" / "requires a
-provisioning profile" gibi hatalarla arsivleme (archive) adimi basarisiz
-olur. Bu script, sadece Pods hedeflerinde CODE_SIGNING_ALLOWED = NO
-ayarlayarak bu sorunu onler; ana uygulama hedefinin (App) imzalama
-ayarlarina dokunmaz.
+    "No signing certificate iOS Development found"
+    "Signing for <Pod> requires a development team"
 
-Idempotent: Script birden fazla kez calistirilsa bile Podfile'a ayni
-blogu tekrar tekrar eklemez; onceden eklenmis oldugunu tespit ederse
-hicbir degisiklik yapmadan cikar.
+Kod imzasi yalnizca ana uygulamada gerekli oldugu icin Pod hedeflerinde
+imzalamayi kapatmak hem guvenli hem de Apple tarafindan kabul edilen
+standart yaklasimdir.
+
+AYRICA: CocoaPods yalnizca TEK bir post_install blogu kabul eder.
+Capacitor kendi Podfile'inda zaten bir post_install tanimlar
+(assertDeploymentTarget). Bu yuzden yeni bir blok EKLEMEK yerine,
+var olan blogun icine ekleme yapariz.
+
+Kullanim: python3 scripts/patch-podfile.py
 """
-
 import os
+import re
 import sys
 
-PODFILE_PATH = os.path.join("ios", "App", "Podfile")
+PODFILE = os.path.join("ios", "App", "Podfile")
 
-# Podfile'a eklenecek post_install hook. Podfile Ruby syntax'i kullanir.
-MARKER = "# >>> patch-podfile.py: disable codesign for Pods targets >>>"
-END_MARKER = "# <<< patch-podfile.py: disable codesign for Pods targets <<<"
+MARKER = "# --- CI: Pod hedeflerinde kod imzalamayi kapat ---"
 
-POST_INSTALL_BLOCK = f'''
-{MARKER}
-post_install do |installer|
+SIGNING_SNIPPET = """
+  """ + MARKER + """
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-      config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      config.build_settings['CODE_SIGNING_IDENTITY'] = ''
+      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+      config.build_settings['CODE_SIGN_ENTITLEMENTS'] = ''
+      config.build_settings['DEVELOPMENT_TEAM'] = ''
+      config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
     end
   end
-end
-{END_MARKER}
-'''
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+    config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+  end
+"""
+
+NEW_POST_INSTALL = """
+post_install do |installer|
+""" + SIGNING_SNIPPET + """end
+"""
+
+
+def log(msg):
+    print("[patch-podfile] %s" % msg)
 
 
 def main():
-    if not os.path.isfile(PODFILE_PATH):
-        print(f"HATA: Podfile bulunamadi: {PODFILE_PATH}", file=sys.stderr)
-        sys.exit(1)
+    if not os.path.exists(PODFILE):
+        log("HATA: %s bulunamadi." % PODFILE)
+        log("'npx cap add ios' bu adimdan ONCE calistirilmis olmali.")
+        return 1
 
-    with open(PODFILE_PATH, "r", encoding="utf-8") as f:
+    with open(PODFILE, "r", encoding="utf-8") as f:
         content = f.read()
 
     if MARKER in content:
-        print("Podfile zaten yamali (marker bulundu). Islem yapilmadi.")
-        return
+        log("Podfile zaten yamalanmis, tekrar islem yapilmadi.")
+        return 0
 
-    # Podfile'da zaten bir post_install bloğu varsa, kullanıcıyı uyar
-    # ama yine de kendi bloğumuzu ayrı olarak sona ekleyelim (Ruby birden
-    # fazla post_install do..end blogunu ayni Podfile icinde calistirmaz,
-    # bu yuzden mevcut bir post_install varsa onun icine enjekte etmemiz
-    # daha guvenli olur).
-    if "post_install do |installer|" in content:
-        # Mevcut post_install blogunun ilk satirindan hemen sonra
-        # kendi kod imzalama ayarlarimizi enjekte ediyoruz.
-        injection = (
-            "\n    # >>> patch-podfile.py: disable codesign for Pods targets >>>\n"
-            "    installer.pods_project.targets.each do |target|\n"
-            "      target.build_configurations.each do |config|\n"
-            "        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'\n"
-            "        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'\n"
-            "        config.build_settings['CODE_SIGN_IDENTITY'] = ''\n"
-            "      end\n"
-            "    end\n"
-            "    # <<< patch-podfile.py: disable codesign for Pods targets <<<\n"
-        )
-        content = content.replace(
-            "post_install do |installer|",
-            "post_install do |installer|" + injection,
-            1,
-        )
-        print("Mevcut post_install blogu bulundu, kod imzalama ayarlari icine enjekte edildi.")
+    # Capacitor'in var olan post_install blogunu bul.
+    match = re.search(r"^post_install do \|(\w+)\|\s*$", content, re.MULTILINE)
+
+    if match:
+        var_name = match.group(1)
+        snippet = SIGNING_SNIPPET
+        # Blok degiskeni 'installer' degilse ona gore uyarla.
+        if var_name != "installer":
+            snippet = snippet.replace("installer.", "%s." % var_name)
+        insert_at = match.end()
+        content = content[:insert_at] + "\n" + snippet + content[insert_at:]
+        log("Var olan post_install blogunun icine imzalama ayarlari eklendi "
+            "(blok degiskeni: '%s')." % var_name)
     else:
-        content = content.rstrip("\n") + "\n" + POST_INSTALL_BLOCK
-        print("Podfile'in sonuna yeni post_install blogu eklendi.")
+        content = content.rstrip() + "\n" + NEW_POST_INSTALL
+        log("Podfile'da post_install blogu yoktu; yenisi olusturuldu.")
 
-    with open(PODFILE_PATH, "w", encoding="utf-8") as f:
+    with open(PODFILE, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"Basariyla yamalandi: {PODFILE_PATH}")
+    log("Tamamlandi: Pod hedeflerinde kod imzalama kapatildi.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
