@@ -1,20 +1,18 @@
 name: Android APK & AAB Derle
 
-# Bu workflow, Android Studio veya manuel islem GEREKMEDEN,
-# push yaptiginizda otomatik olarak APK ve AAB uretir.
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch: {}   # "Actions" sekmesinden elle de tetiklenebilir
+  workflow_dispatch: {}
   release:
     types: [ created ]
 
 permissions:
-  contents: write   # Release'e dosya eklemek icin gerekli
+  contents: write
 
 jobs:
   build:
-    name: Build Android APK & AAB
+    name: Build Android App
     runs-on: ubuntu-latest
 
     steps:
@@ -35,11 +33,26 @@ jobs:
       - name: NPM bagimliliklarini kur
         run: npm install
 
-      - name: Capacitor Android platformunu ekle (tazece uretilir)
+      - name: Eski android klasorunu temizle
+        run: |
+          if [ -d "android" ]; then
+            echo "Eski android/ klasoru bulundu, siliniyor..."
+            rm -rf android
+          else
+            echo "android/ klasoru yok, temiz baslangic."
+          fi
+
+      - name: Capacitor Android platformunu ekle
         run: npx cap add android
 
-      - name: Android SDK versiyonlarini garanti altina al (compileSdk hatasi icin)
+      # ▼▼▼ EKSİK OLAN ADIM BUYDU ▼▼▼
+      # compileSdk/targetSdk = 36 degerlerini garanti eder.
+      # Bu adim olmadan:
+      #   - "compileSdkVersion is not specified" hatasi alirsiniz
+      #   - Play Store "Android 16 (API 36) hedefleyin" diyerek reddeder
+      - name: Android SDK versiyonlarini garanti altina al (compileSdk / targetSdk 36)
         run: python3 scripts/ensure-android-sdk.py
+      # ▲▲▲ EKSİK OLAN ADIM BUYDU ▲▲▲
 
       - name: Uygulama ikonu ve splash screen gorsellerini uret
         run: npx capacitor-assets generate --android
@@ -47,10 +60,24 @@ jobs:
       - name: Reklam kimliklerini (AdMob) projeye isle
         run: python3 scripts/patch-ads.py
 
+      - name: Firebase google-services.json dosyasini kopyala (varsa)
+        run: |
+          if [ -f "resources/google-services.json" ]; then
+            cp resources/google-services.json android/app/google-services.json
+            echo "google-services.json android/app/ altina kopyalandi."
+          else
+            echo "UYARI: resources/google-services.json bulunamadi. Firebase Analytics olmadan devam ediliyor."
+          fi
+
       - name: Web varliklarini native projeye senkronize et
         run: npx cap sync android
 
-      - name: İmzalama sirlari mevcut mu kontrol et
+      - name: Derleme parametrelerini belirle
+        id: params
+        run: |
+          echo "version_code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Imzalama sirlari mevcut mu kontrol et
         id: signing-check
         run: |
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.KEYSTORE_PASSWORD }}" ] && [ -n "${{ secrets.KEY_ALIAS }}" ] && [ -n "${{ secrets.KEY_PASSWORD }}" ]; then
@@ -59,14 +86,14 @@ jobs:
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Keystore dosyasini olustur (sirlar mevcutsa)
+      - name: "[Imzali mod] Keystore dosyasini olustur"
         if: steps.signing-check.outputs.has_signing == 'true'
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
       - name: Android projesini duzenle (izinler, versionCode, imzalama, kucultme)
         env:
-          CI_VERSION_CODE: ${{ github.run_number }}
+          CI_VERSION_CODE: ${{ steps.params.outputs.version_code }}
           HAS_SIGNING_SECRETS: ${{ steps.signing-check.outputs.has_signing }}
           CI_KEYSTORE_PATH: release.keystore
           CI_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -74,7 +101,9 @@ jobs:
           CI_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: python3 scripts/patch-android.py
 
-      - name: DEBUG - build.gradle icerigini goster (sorun cikarsa buradan bakilir)
+      # Sorun cikarsa buradaki ciktidan hangi SDK surumlerinin
+      # kullanildigini gorebilirsiniz.
+      - name: DEBUG - gradle ayarlarini goster
         run: |
           echo "===== android/variables.gradle ====="
           cat android/variables.gradle
@@ -82,9 +111,7 @@ jobs:
           echo "===== android/app/build.gradle ====="
           cat android/app/build.gradle
 
-      - name: Gradle wrapper'a calistirma izni ver
-        run: chmod +x android/gradlew
-
+      # Gradle onbellegi: derleme suresini belirgin sekilde kisaltir.
       - name: Gradle bagimliliklarini onbellekle
         uses: actions/cache@v4
         with:
@@ -95,39 +122,27 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: APK derle (assembleRelease)
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: AAB derle (bundleRelease - Play Store icin)
-        working-directory: android
-        run: ./gradlew bundleRelease --no-daemon
-
-      - name: Derleme ozetini yazdir
+      - name: Gradle ile APK ve AAB derle
         run: |
-          echo "### 📦 Derleme Sonuclari" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ "${{ steps.signing-check.outputs.has_signing }}" = "true" ]; then
-            echo "✅ **Imzalama:** Gercek release anahtariyla imzalandi. Bu AAB dogrudan Play Store'a yuklenebilir." >> "$GITHUB_STEP_SUMMARY"
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Derleme ozeti
+        run: |
+          if [ "${{ steps.signing-check.outputs.has_signing }}" == "true" ]; then
+            echo "### ✅ Play Store'a Hazir AAB Uretildi" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "⚠️ **Imzalama:** Sirlar (secrets) tanimlanmadigi icin bu build GECICI debug anahtariyla imzalandi." >> "$GITHUB_STEP_SUMMARY"
-            echo "Bu haliyle APK/AAB **test icin kurulabilir** ama **Play Store'a yuklenemez**." >> "$GITHUB_STEP_SUMMARY"
-            echo "Play Store'a hazir imzali build icin repo Settings > Secrets and variables > Actions bolumune su sirlari ekleyin:" >> "$GITHUB_STEP_SUMMARY"
-            echo "- \`KEYSTORE_BASE64\` (keystore dosyanizin base64 hali)" >> "$GITHUB_STEP_SUMMARY"
-            echo "- \`KEYSTORE_PASSWORD\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- \`KEY_ALIAS\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "- \`KEY_PASSWORD\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "(Detayli adimlar icin README.md dosyasina bakin.)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### ⚠️ Imzalama sirlari (secrets) tanimlanmadigi icin GECICI debug anahtariyla imzalandi." >> "$GITHUB_STEP_SUMMARY"
+            echo "Bu APK/AAB test icin kurulabilir ama Play Store'a YUKLENEMEZ." >> "$GITHUB_STEP_SUMMARY"
+            echo "Gerekli 4 secret: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- versionCode: \`${{ github.run_number }}\`" >> "$GITHUB_STEP_SUMMARY"
-          find android/app/build/outputs/apk/release -name "*.apk" -exec echo "- APK: {}" \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
-          find android/app/build/outputs/bundle/release -name "*.aab" -exec echo "- AAB: {}" \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo "- versionCode: \`${{ steps.params.outputs.version_code }}\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: APK'yi is akisi ciktisi olarak yukle
         uses: actions/upload-artifact@v4
         with:
-          name: hemsire-rehberi-pro-apk
+          name: klinik-rehber-pro-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 90
@@ -135,12 +150,12 @@ jobs:
       - name: AAB'yi is akisi ciktisi olarak yukle
         uses: actions/upload-artifact@v4
         with:
-          name: hemsire-rehberi-pro-aab
+          name: klinik-rehber-pro-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 90
 
-      - name: Dosyalari GitHub Release'e ekle (yalnizca release olayinda)
+      - name: Dosyalari GitHub Release'e ekle
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
