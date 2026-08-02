@@ -8,10 +8,10 @@ Xcode kurmanıza ya da elle bir işlem yapmanıza gerek yoktur (iOS derlemesi
 GitHub'ın bulut üzerindeki macOS runner'ında, Xcode önceden kurulu şekilde
 çalışır).
 
-## 📢 AdMob Reklamları ve Firebase Analytics
+## 📢 AdMob Reklamları
 
-Uygulamaya Google AdMob (banner + geçiş + ödüllü reklam) ve Firebase Analytics
-altyapısı entegre edilmiştir. **Varsayılan olarak Google'ın resmi TEST reklam
+Uygulamaya Google AdMob (banner + geçiş + ödüllü reklam) altyapısı entegre
+edilmiştir. (Firebase Analytics kaldırıldı — aşağıya bakınız.) **Varsayılan olarak Google'ın resmi TEST reklam
 kimlikleri** kullanılır — bunlar gerçek para kazandırmaz ama güvenle test
 edilebilir, App Store/Play Store politikalarını ihlal etmez.
 
@@ -49,26 +49,46 @@ Google, AB/İngiltere/İsviçre'deki kullanıcılara reklam gösterilmeden önce
 
 **Sizin yapmanız gereken tek şey:** [AdMob hesabınızda](https://apps.admob.com) **Gizlilik ve mesajlaşma (Privacy & messaging)** bölümünden bir "GDPR mesajı" (rıza formu şablonu) oluşturup yayınlamak. Bu, kod değişikliği gerektirmez — Google konsolunda birkaç dakikalık bir kurulumdur. Bu adım tamamlanmadan uygulama çökmez, sadece form gösterilmez ve reklamlar doğrudan başlatılır.
 
-### Firebase Analytics kurulumu (elle yapmanız gereken tek adım)
+### Firebase Analytics — ŞU AN KURULU DEĞİL
 
-Firebase Analytics çalışması için **kendi Firebase projenizi** oluşturup
-yapılandırma dosyalarını eklemeniz gerekir (bunu sizin adınıza oluşturamam,
-Google hesabınıza bağlıdır):
+`@capacitor-firebase/analytics` bağımlılığı **kaldırıldı.** Sebebi:
 
-1. [Firebase Console](https://console.firebase.google.com) → yeni proje oluşturun.
-2. Android uygulaması ekleyin (paket adı: `capacitor.config.json` içindeki `appId` ile birebir aynı olmalı) → **`google-services.json`** indirin → repoya `android/app/google-services.json` yoluna ekleyin (not: `android/` klasörü her derlemede yeniden üretildiği için, bu dosyayı **CI'da otomatik kopyalanacak şekilde** `resources/google-services.json` konumuna koyup `scripts/patch-ads.py`'ye bir kopyalama adımı eklemeniz gerekir — bu adımı isterseniz sizin için hazırlarım).
-3. iOS uygulaması ekleyin → **`GoogleService-Info.plist`** indirin → benzer şekilde `resources/` altına eklenip CI'da kopyalanması gerekir.
-4. Firebase Console'da Analytics'i etkinleştirin.
+- Ne `GoogleService-Info.plist` (iOS) ne `google-services.json` (Android)
+  projede mevcuttu; bunlar olmadan Firebase zaten hiçbir veri toplayamıyordu.
+- Buna rağmen iOS derlemesini şu hatayla kırıyordu:
+  `no such module 'FirebaseCore'` → **ARCHIVE FAILED**.
 
-> **Not:** Bu adım tamamlanmadan uygulama **çökmez** — `FirebaseAnalytics`
-> eklentisi bulunamazsa (Plugins.FirebaseAnalytics kontrolü ile) analytics
-> çağrıları sessizce atlanır, reklam sistemi bundan etkilenmez.
+Uygulama kodu Firebase'i zaten isteğe bağlı olarak kullanıyor
+(`Plugins.FirebaseAnalytics || null`), bu yüzden kaldırılması hiçbir
+özelliği bozmaz — analytics çağrıları sessizce atlanır.
 
-### Takip edilen olaylar (Firebase Analytics)
+#### İleride gerçekten Firebase Analytics isterseniz
 
-`screen_view`, `banner_impression`, `interstitial_shown`, `rewarded_ad_completed`,
-`premium_status_changed`, `session_duration` — bunlar mobil köprü scriptinin
-AdMob modülünde otomatik loglanır.
+Sırasıyla şunlar gerekir (üçü de yapılmadan çalışmaz):
+
+1. [Firebase Console](https://console.firebase.google.com)'da proje oluşturun.
+   Android ve iOS uygulamalarını ekleyin — paket adı `capacitor.config.json`
+   içindeki `appId` ile **birebir aynı** olmalı (`com.klinikrehberpro.app`).
+2. İndirdiğiniz dosyaları repoya koyun:
+   - `resources/google-services.json`
+   - `resources/GoogleService-Info.plist`
+3. Yapılandırma dosyalarını CI'da native projelere kopyalayın:
+   - Android: `build-android.yml` içinde bu adım **zaten var**.
+   - iOS: `ios-build.yml`'ye `npx cap sync ios` ADIMINDAN ÖNCE ekleyin:
+     ```yaml
+     - name: Firebase GoogleService-Info.plist kopyala
+       run: |
+         if [ -f "resources/GoogleService-Info.plist" ]; then
+           cp resources/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
+         fi
+     ```
+     Ayrıca dosyanın Xcode projesinin "Copy Bundle Resources" fazına
+     eklenmesi gerekir — yalnızca kopyalamak yetmez.
+4. `package.json` içine `"@capacitor-firebase/analytics": "^6.3.0"` satırını geri ekleyin.
+
+> iOS'ta `GoogleService-Info.plist` uygulama paketine gerçekten girmezse,
+> Firebase çalışma zamanında başlatılamaz. Bu yüzden 3. adımdaki
+> "Copy Bundle Resources" kısmı atlanmamalıdır.
 
 ### Reklam davranış kuralları (kod içinde uygulanmıştır)
 
@@ -272,7 +292,7 @@ cd android
 ├── .github/workflows/build-ios.yml       # iOS otomatik derleme iş akışı
 ├── ad-config.json                        # AdMob reklam kimlikleri (TEK dosyadan yönetim)
 ├── capacitor.config.json                 # Capacitor yapılandırması (Android+iOS)
-├── package.json                          # Bağımlılıklar (Android+iOS+AdMob+Firebase)
+├── package.json                          # Bağımlılıklar (Android+iOS+AdMob+Abonelik)
 ├── resources/
 │   ├── icon.png                          # Uygulama ikonu kaynağı (1024x1024)
 │   ├── splash.png                        # Açılış ekranı kaynağı (2732x2732)
@@ -360,3 +380,85 @@ teklifini App Store Connect ve Play Console'da oluşturmadan hiçbiri çalışma
 
 > ⏰ Google, 31 Ağustos 2026'dan itibaren Billing Library 8+ şartı koyuyor. Kullanılan
 > eklenti sürümü Billing 9 ile derlenir; eski sürüme düşürmeyin.
+
+
+## Harici Bağlantıların Açılması
+
+Capacitor WebView'inde `<a target="_blank">` beklendiği gibi çalışmaz: iOS'ta bağlantı
+hiç açılmaz, Android'de aynı WebView'de açılıp tek sayfalık uygulamayı ekrandan kaldırır
+(uygulama donmuş görünür).
+
+Bu yüzden `www/index.html` içinde, diğer eklentilerden **bağımsız** çalışan bir blok var:
+
+- `window.openExternalUrl(url)` — adresi sistemin uygulama içi tarayıcısında açar
+  (iOS: SFSafariViewController, Android: Chrome Custom Tabs). Sayfa uygulamanın üstünde
+  açılır, "Bitti" ile kapatılır, uygulama arka planda olduğu yerde kalır.
+- Belge düzeyinde bir tıklama dinleyicisi, `http`/`https` ile başlayan **tüm** bağlantıları
+  yakalar. Yeni kaynak eklerken ekstra bir şey yapmanız gerekmez.
+- `javascript:` gibi diğer şemalar güvenlik gereği yok sayılır.
+- Gerekli eklenti: `@capacitor/browser`. Eklenti yoksa (ör. masaüstü tarayıcı)
+  otomatik olarak `window.open` ile yeni sekmeye düşer.
+
+
+## iOS Derleme Sorunları ve Sürüm Sabitleme
+
+`scripts/patch-podfile.py`, CI'da `npx cap sync ios` çalışmadan önce Podfile'a
+iki müdahale yapar:
+
+### 1) Pod hedeflerinde kod imzalamayı kapatır
+CI'daki imzalama kimliği yalnızca ana uygulama hedefi için geçerlidir.
+Kapatılmazsa arşivleme `Signing for <Pod> requires a development team`
+hatasıyla çöker.
+
+### 2) GoogleUserMessagingPlatform'u 2.x serisine sabitler
+
+`@capacitor-community/admob` eklentisinin iOS kodu, Google'ın rıza (UMP)
+SDK'sının **eski Swift isimlerini** kullanır:
+
+| Eklentinin kullandığı (UMP 2.x) | UMP 3.0+ karşılığı |
+|---|---|
+| `UMPConsentInformation.sharedInstance` | `ConsentInformation.shared` |
+| `UMPConsentStatus` | `ConsentStatus` |
+
+Google, UMP 3.0.0 (24 Mart 2025) ile Swift API isimlerini değiştirdi.
+Eklentinin podspec dosyası UMP sürümünü sabitlemediği için CocoaPods her
+derlemede en güncel sürümü çeker ve derleme şu hatalarla kırılır:
+
+```
+'sharedInstance' has been renamed to 'shared'
+'UMPConsentStatus' has been renamed to 'ConsentStatus'
+** ARCHIVE FAILED **
+```
+
+> Bu, **kodunuzda hiçbir şey değişmeden derlemenin bir gün çalışıp ertesi gün
+> çalışmamasının** sebebidir: Google yeni sürüm yayınladığı anda derleme kırılır.
+
+Script bu yüzden Podfile'a şu satırı ekler:
+
+```ruby
+pod 'GoogleUserMessagingPlatform', '~> 2.0'
+```
+
+`~> 2.0`, 2.x serisinin en güncel sürümünü seçer ama 3.0'a geçmez.
+
+#### Eğer CocoaPods sürüm çakışması bildirirse
+
+`pod install` şuna benzer bir hata verirse:
+
+```
+CocoaPods could not find compatible versions for pod "GoogleUserMessagingPlatform"
+```
+
+Google Mobile Ads SDK'nın çektiği sürüm UMP 3.x istiyor demektir. Bu durumda
+`scripts/patch-podfile.py` içindeki `PINNED_PODS` bloğuna şu satırı da ekleyin:
+
+```ruby
+  pod 'Google-Mobile-Ads-SDK', '~> 11.0'
+```
+
+#### Kalıcı çözüm
+
+`@capacitor-community/admob` eklentisinin UMP 3.x'i destekleyen bir sürümü
+çıktığında (Capacitor 7 gerektirebilir), sabitlemeyi kaldırıp eklentiyi
+yükseltmek daha doğrudur. Sabitleme, o güne kadar derlemeyi öngörülebilir
+kılan geçici bir önlemdir.
