@@ -190,6 +190,27 @@
   .src-banner .src-inline{color:var(--blue-700);}
   .btn-outline{background:transparent;color:var(--blue-700);border:1.5px solid var(--blue-700);padding:10px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;}
   .btn-outline:active{opacity:.6;}
+  /* ===== SATIN ALMA (IAP) ===== */
+  .iap-card{background:linear-gradient(135deg,var(--blue-100),var(--bg));border:1.5px solid var(--blue-500);border-radius:14px;padding:16px;margin-bottom:14px;}
+  .iap-title{font-size:16px;font-weight:800;color:var(--blue-700);margin-bottom:4px;}
+  .iap-price{font-size:22px;font-weight:800;color:var(--ink);margin:10px 0 2px;}
+  .iap-price-note{font-size:11px;color:var(--ink-2);margin-bottom:12px;}
+  .iap-benefits{list-style:none;padding:0;margin:10px 0 14px;}
+  .iap-benefits li{font-size:12.5px;color:var(--ink-2);line-height:1.7;padding-left:20px;position:relative;}
+  .iap-benefits li:before{content:'✓';position:absolute;left:0;color:var(--blue-700);font-weight:800;}
+  .btn-buy{width:100%;background:var(--blue-700);color:#fff;border:none;padding:14px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;}
+  .btn-buy:active{opacity:.75;}
+  .btn-buy:disabled{opacity:.5;cursor:default;}
+  .btn-restore{width:100%;background:transparent;color:var(--blue-700);border:none;padding:12px;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;}
+  .btn-restore:disabled{opacity:.5;cursor:default;text-decoration:none;}
+  .iap-owned{background:var(--blue-100);border:1.5px solid var(--blue-700);border-radius:14px;padding:16px;margin-bottom:14px;}
+  .iap-err{background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:10px;}
+  .iap-ok{background:#F0FDF4;border:1px solid #86EFAC;color:#166534;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:10px;}
+  .iap-legal{font-size:10.5px;color:var(--ink-2);line-height:1.6;margin-top:12px;text-align:center;}
+  .iap-legal a{color:var(--blue-700);text-decoration:underline;}
+  .iap-legal{text-align:left;}
+  .iap-badge{display:inline-block;background:var(--blue-700);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;vertical-align:middle;margin-left:4px;}
+  .iap-trial{background:#F0FDF4;border:1px solid #86EFAC;color:#166534;border-radius:10px;padding:10px 12px;font-size:11.5px;line-height:1.6;margin-bottom:12px;}
 </style>
 </head>
 <body>
@@ -276,7 +297,34 @@ const DISCLAIMER = "Bu uygulama yalnızca eğitim ve bilgi amaçlıdır. Klinik 
         (satın al + "Satın Alımları Geri Yükle" düğmesi zorunludur).
      4. Ancak bundan sonra bu bayrağı `true` yapın.
    ============================================================ */
-const PREMIUM_IAP_ENABLED = false;
+const PREMIUM_IAP_ENABLED = true;
+
+/* ============================================================
+   SATIN ALMA YAPILANDIRMASI
+   ------------------------------------------------------------
+   productId, App Store Connect ve Google Play Console'da
+   OLUŞTURDUĞUNUZ ürün kimliğiyle BİREBİR AYNI olmalıdır.
+   İki mağazada da aynı kimliği kullanmanız önerilir.
+
+   ⚠️ legalUrls alanlarını kendi yayınladığınız sayfalarla
+   doldurun. Apple, uygulama içi satın alma bulunan uygulamalarda
+   gizlilik politikası bağlantısı ister; App Store Connect'teki
+   gizlilik politikası alanıyla aynı adres olmalıdır.
+   ============================================================ */
+window.IAP_CONFIG = {
+  enabled: true,
+  /* App Store Connect ve Play Console'da oluşturduğunuz ABONELİK
+     ürün kimliğiyle BİREBİR AYNI olmalıdır. */
+  productId: 'com.klinikrehberpro.app.monthly',
+  legalUrls: {
+    /* ⚠️ Kendi yayınladığınız sayfalarla DEĞİŞTİRİN.
+       Apple, abonelik içeren uygulamalarda her ikisinin de
+       uygulama içinde tıklanabilir olmasını ZORUNLU tutar
+       (Yönerge 3.1.2). */
+    privacy: 'https://ornek-alan-adiniz.com/gizlilik',
+    terms:   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+  }
+};
 
 /* ============================================================
    KAYNAK / REFERANS MODÜLÜ
@@ -7565,17 +7613,111 @@ function viewABG(){
 }
 
 /* ============ AYARLAR (REKLAM YÖNETİMİ / PREMIUM) ============ */
+
+/* ============================================================
+   ABONELİK BÖLÜMÜ (Ayarlar ekranı)
+
+   App Store Yönerge 3.1.2 (Abonelikler) gereği bu ekranda
+   ZORUNLU olarak bulunması gerekenler:
+     • Aboneliğin adı
+     • Abonelik süresi (ör. aylık)
+     • Dönem başına fiyat
+     • Ücretsiz deneme varsa süresi ve deneme sonrası ne olacağı
+     • Otomatik yenileme açıklaması (iptal edilmezse yenilenir,
+       ücret dönem bitiminden önceki 24 saat içinde alınır,
+       yönetim hesap ayarlarından yapılır)
+     • Gizlilik Politikası ve Kullanım Koşulları'na ÇALIŞAN bağlantılar
+     • "Satın Alımları Geri Yükle" düğmesi (Yönerge 3.1.1)
+   ============================================================ */
+function renderIapSection(){
+  const s = window.__iapState || { available:false, reason:'plugin-missing' };
+  const cfg = window.IAP_CONFIG || {};
+  const legal = cfg.legalUrls || {};
+  const APPSTORE = 'App Store / Google Play';
+
+  const legalLinks = `
+    ${legal.privacy? `<a href="${legal.privacy}" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</a>` : ''}
+    ${(legal.privacy && legal.terms)? ' &middot; ' : ''}
+    ${legal.terms? `<a href="${legal.terms}" target="_blank" rel="noopener noreferrer">Kullanım Koşulları</a>` : ''}`;
+
+  /* Tarayıcıda abonelik satın alınamaz. */
+  if (!s.available && s.reason === 'browser'){
+    return `<div class="section-title">⭐ Reklamsız Abonelik</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="field-val">Abonelik işlemleri yalnızca iOS ve Android uygulamasında yapılabilir.</div>
+    </div>`;
+  }
+
+  /* Aboneliği aktif olan kullanıcı. */
+  if (s.owned){
+    const bitis = s.expiry ? new Date(s.expiry).toLocaleDateString('tr-TR') : null;
+    return `<div class="section-title">⭐ Reklamsız Abonelik</div>
+    <div class="iap-owned">
+      <div class="iap-title">✅ Aboneliğiniz Aktif</div>
+      <div class="field-val" style="margin-top:6px;">Uygulamada artık hiçbir reklam gösterilmiyor. Teşekkür ederiz.</div>
+      ${bitis? `<div class="field-val" style="margin-top:6px;">Mevcut dönem bitişi: <b>${bitis}</b> (iptal etmezseniz otomatik yenilenir).</div>` : ''}
+      <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="window.iapManageSubscription&&window.iapManageSubscription()">Aboneliği Yönet / İptal Et</button>
+      <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">${s.busy? 'İşleniyor…' : 'Satın Alımları Geri Yükle'}</button>
+      <div class="iap-legal">${legalLinks}</div>
+    </div>`;
+  }
+
+  /* Mağazaya ulaşılamıyor — geri yükleme yine de sunulmalı. */
+  if (!s.available){
+    return `<div class="section-title">⭐ Reklamsız Abonelik</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="field-val">Mağazaya şu anda bağlanılamıyor. İnternet bağlantınızı kontrol edip uygulamayı yeniden başlatmayı deneyin.</div>
+      <button class="btn-restore" onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">Satın Alımları Geri Yükle</button>
+    </div>`;
+  }
+
+  const donem     = s.period || 'ay';
+  const showTrial = !!(s.trial && s.trialEligible);
+  const priceLine = s.price
+      ? `${s.price} / ${donem}`
+      : (s.loading ? 'Fiyat yükleniyor…' : 'Fiyat alınamadı');
+  const canBuy    = !!s.price && !s.busy && !s.loading;
+  const btnLabel  = s.busy ? 'İşleniyor…' : (showTrial ? `${s.trial} ücretsiz dene` : 'Abone Ol');
+
+  /* Apple'ın istediği otomatik yenileme açıklaması. */
+  const yenilemeMetni = `Ödeme, satın almayı onayladığınızda ${APPSTORE} hesabınıza yansıtılır.
+    Abonelik, mevcut dönem bitmeden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir.
+    Yenileme ücreti, dönem bitiminden önceki 24 saat içinde tahsil edilir.
+    Aboneliğinizi ${APPSTORE} hesap ayarlarınızdan istediğiniz zaman yönetebilir veya iptal edebilirsiniz.`;
+
+  const denemeMetni = showTrial
+    ? `İlk <b>${s.trial}</b> ücretsizdir. Deneme süresi bitmeden en az 24 saat önce iptal etmezseniz,
+       abonelik otomatik olarak <b>${s.price || ''} / ${donem}</b> üzerinden başlar.
+       Deneme süresi içinde iptal ederseniz ücret alınmaz.`
+    : '';
+
+  return `<div class="section-title">⭐ Reklamsız Abonelik</div>
+  <div class="iap-card">
+    <div class="iap-title">Klinik Rehber Pro — Reklamsız${showTrial? ` <span class="iap-badge">${s.trial} ücretsiz</span>` : ''}</div>
+    <div class="field-val">Aylık abonelikle uygulamadaki tüm reklamlar kapanır.</div>
+    <ul class="iap-benefits">
+      <li>Alt banner reklamı tamamen kalkar</li>
+      <li>Sayfa geçişlerinde reklam gösterilmez</li>
+      <li>Tüm klinik içerik ve hesaplayıcılar aynen kalır</li>
+      <li>İstediğiniz zaman iptal edebilirsiniz</li>
+    </ul>
+    <div class="iap-price">${priceLine}</div>
+    <div class="iap-price-note">Otomatik yenilenen abonelik. Fiyat, bulunduğunuz ülkenin mağazasına göre gösterilir.</div>
+    ${denemeMetni? `<div class="iap-trial">${denemeMetni}</div>` : ''}
+    <button class="btn-buy" ${canBuy?'':'disabled'} onclick="window.iapSubscribe&&window.iapSubscribe()">${btnLabel}</button>
+    <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">Satın Alımları Geri Yükle</button>
+    ${s.error? `<div class="iap-err">${esc(s.error)}</div>` : ''}
+    ${(s.restoreDone && !s.owned && !s.error)? `<div class="iap-ok">Geri yüklenecek aktif abonelik bulunamadı. Daha önce abone olduysanız, o sırada kullandığınız hesapla giriş yaptığınızdan emin olun.</div>` : ''}
+    <div class="iap-legal">${yenilemeMetni}<br/><br/>${legalLinks}</div>
+  </div>`;
+}
+
 function viewSettings(){
   const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   return `
   <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>Ayarlar</h1></div>
 
-  ${PREMIUM_IAP_ENABLED? `
-  <div class="section-title">⭐ Üyelik</div>
-  <div class="card" style="margin-bottom:14px;">
-    <div class="card-title">${state.premium? '✅ Premium Aktif' : 'Ücretsiz Sürüm'}</div>
-    <div class="field-val" style="margin-top:6px;">${state.premium? 'Premium üyeliğiniz aktif; reklam görmüyorsunuz.' : 'Premium üyelikle tüm reklamlar (geçiş, ödüllü) tamamen kapanır.'}</div>
-  </div>` : ''}
+  ${PREMIUM_IAP_ENABLED? renderIapSection() : ''}
 
   <div class="section-title">ℹ️ Reklam Durumu</div>
   <div class="card">
@@ -7949,6 +8091,8 @@ loadPersisted();
       if (!FirebaseAnalytics) return;
       try { FirebaseAnalytics.logEvent({ name: name, params: params || {} }); } catch(e){}
     }
+    /* IAP köprüsünün de olay kaydedebilmesi için dışa açılır. */
+    window.__iapLogEvent = logEvent;
 
     function isOnline(){
       try { return navigator.onLine !== false; } catch(e){ return true; }
@@ -8125,6 +8269,297 @@ loadPersisted();
     }, 800);
   })();
 })();
+</script>
+
+<script>
+/* ================================================================
+   ABONELİK KÖPRÜSÜ (cordova-plugin-purchase v13)
+
+   ÜRÜN: Aylık, otomatik yenilenen abonelik + ilk hafta ücretsiz deneme.
+
+   ⚠️ ÜCRETSİZ DENEME KODLA YAPILMAZ.
+   Deneme süresi, mağaza panellerinde "teklif" (offer) olarak
+   tanımlanır:
+     • App Store Connect → Abonelik → Tanıtım Teklifi →
+       "Ücretsiz Deneme", süre: 1 hafta
+     • Play Console → Abonelik → Temel plan → Teklif →
+       "Ücretsiz deneme", süre: 1 hafta
+   Bu modül denemeyi mağazadan OKUR, ekranda gösterir ve
+   kullanıcının uygun olup olmadığına göre düğme metnini değiştirir.
+   Süreyi, fiyatı veya uygunluğu kod belirlemez — mağaza belirler.
+   ================================================================ */
+(function(){
+  'use strict';
+
+  if (!window.IAP_CONFIG || !window.IAP_CONFIG.enabled) return;
+
+  var Capacitor = window.Capacitor;
+  var isNative = !!(Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+
+  if (!isNative) {
+    window.__iapState = { available:false, reason:'browser', loading:false };
+    return;
+  }
+
+  window.__iapState = {
+    available:true, loading:true, owned:false, busy:false,
+    price:null, period:null, trial:null, trialEligible:false,
+    error:null, reason:null, expiry:null
+  };
+
+  /* ---- Eklentinin hazır olmasını bekle ----
+     cordova-plugin-purchase, Capacitor'ın Cordova uyumluluk katmanı
+     üzerinden yüklenir; `CdvPurchase` genel değişkeni ancak
+     `deviceready` olayından sonra oluşur. */
+  function whenPluginReady(cb){
+    if (window.CdvPurchase && window.CdvPurchase.store) { cb(); return; }
+    var done = false, tries = 0;
+    function attempt(){
+      if (done) return;
+      if (window.CdvPurchase && window.CdvPurchase.store) { done = true; cb(); return; }
+      if (++tries > 100) {                       /* ~20 sn sonra vazgeç */
+        done = true;
+        window.__iapState.available = false;
+        window.__iapState.loading = false;
+        window.__iapState.reason = 'plugin-missing';
+        refreshUI();
+        return;
+      }
+      setTimeout(attempt, 200);
+    }
+    document.addEventListener('deviceready', attempt, { once:true });
+    attempt();
+  }
+
+  function refreshUI(){
+    try {
+      if (typeof state !== 'undefined' && state.view === 'settings' && typeof render === 'function') render();
+    } catch(e){}
+  }
+  function iapLog(name, params){
+    try { if (typeof window.__iapLogEvent === 'function') window.__iapLogEvent(name, params||{}); } catch(e){}
+  }
+
+  whenPluginReady(function(){ startIap(); });
+
+  function startIap(){
+  var CdvPurchase = window.CdvPurchase;
+  var store       = CdvPurchase.store;
+  var ProductType = CdvPurchase.ProductType;
+  var Platform    = CdvPurchase.Platform;
+  var ErrorCode   = CdvPurchase.ErrorCode;
+  var PRODUCT_ID  = window.IAP_CONFIG.productId;
+
+  function getProduct(){
+    try {
+      return store.get(PRODUCT_ID, Platform.APPLE_APPSTORE)
+          || store.get(PRODUCT_ID, Platform.GOOGLE_PLAY)
+          || store.get(PRODUCT_ID);
+    } catch(e){ return null; }
+  }
+
+  /* ISO 8601 süreyi (P1W, P1M, P7D, P1Y) Türkçe metne çevirir. */
+  function periodText(iso){
+    if (!iso) return null;
+    var m = /^P(\d+)([DWMY])$/.exec(iso);
+    if (!m) return null;
+    var n = parseInt(m[1], 10), u = m[2];
+    if (u === 'D') return n === 1 ? '1 gün'    : n + ' gün';
+    if (u === 'W') return n === 1 ? '1 hafta'  : n + ' hafta';
+    if (u === 'M') return n === 1 ? '1 ay'     : n + ' ay';
+    if (u === 'Y') return n === 1 ? '1 yıl'    : n + ' yıl';
+    return null;
+  }
+
+  /* Teklifin fiyat aşamalarını okur.
+     Ücretsiz deneme = fiyatı 0 olan İLK aşama.
+     Asıl ücret     = fiyatı 0'dan büyük İLK aşama. */
+  function readOffer(p){
+    var out = { price:null, period:null, trial:null };
+    if (!p) return out;
+    var offer = null;
+    try { offer = p.getOffer ? p.getOffer() : (p.offers && p.offers[0]); } catch(e){}
+    if (!offer && p.offers && p.offers.length) offer = p.offers[0];
+
+    var phases = (offer && offer.pricingPhases) || [];
+    for (var i = 0; i < phases.length; i++){
+      var ph = phases[i];
+      var free = (ph.priceMicros === 0) || (ph.paymentMode === 'FreeTrial');
+      if (free && !out.trial) {
+        out.trial = periodText(ph.billingPeriod);
+      } else if (!free && !out.price) {
+        out.price  = ph.price;
+        out.period = periodText(ph.billingPeriod);
+      }
+    }
+    /* Aşama bilgisi yoksa ürünün düz alanlarına düş. */
+    if (!out.price && p.pricing && p.pricing.price) out.price = p.pricing.price;
+    if (!out.period && p.billingPeriod) out.period = periodText(p.billingPeriod);
+    return out;
+  }
+
+  /* Denemeye uygunluk: iOS'ta daha önce deneme kullanıldıysa
+     ineligibleForIntroPrice true olur. */
+  function trialEligible(p){
+    if (!p) return false;
+    try { if (p.ineligibleForIntroPrice) return false; } catch(e){}
+    return true;
+  }
+
+  function syncOwnership(sourceLabel){
+    var p = getProduct();
+    var owned = false;
+    try { owned = !!(p && p.owned); } catch(e){ owned = false; }
+
+    var off = readOffer(p);
+    var st = window.__iapState;
+    st.owned         = owned;
+    st.price         = off.price;
+    st.period        = off.period;
+    st.trial         = off.trial;
+    st.trialEligible = trialEligible(p);
+    st.loading       = false;
+    try { st.expiry = (p && p.expiryDate) ? new Date(p.expiryDate) : null; } catch(e){ st.expiry = null; }
+
+    if (typeof state === 'undefined') { refreshUI(); return; }
+
+    if (state.premium !== owned) {
+      state.premium = owned;
+      try { if (typeof savePremium === 'function') savePremium(); } catch(e){}
+      try { if (typeof window.__adsBridgeOnPremiumChange === 'function') window.__adsBridgeOnPremiumChange(owned); } catch(e){}
+      iapLog('premium_status_changed', { premium: owned, source: sourceLabel || 'store' });
+    }
+    refreshUI();
+  }
+
+  /* ---- Ürün kaydı: aylık, otomatik yenilenen abonelik ---- */
+  try {
+    store.register([
+      { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.APPLE_APPSTORE },
+      { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.GOOGLE_PLAY }
+    ]);
+  } catch(e){}
+
+  store.when()
+    .productUpdated(function(){
+      var p = getProduct(), off = readOffer(p), st = window.__iapState;
+      st.price = off.price; st.period = off.period; st.trial = off.trial;
+      st.trialEligible = trialEligible(p);
+      refreshUI();
+    })
+    /* Doğrulama sunucusu kullanılmadığı için işlem doğrudan
+       sonlandırılır. Android'de finish() aynı zamanda Google'ın
+       zorunlu tuttuğu "acknowledge" çağrısıdır; 3 gün içinde
+       yapılmazsa Google satın almayı otomatik iade eder. */
+    .approved(function(transaction){ try { transaction.finish(); } catch(e){} })
+    .finished(function(){ syncOwnership('purchase'); })
+    .receiptsReady(function(){ syncOwnership('receipts'); })
+    /* Abonelik süresi dolduğunda premium otomatik kalkar. */
+    .expired(function(){ syncOwnership('expired'); });
+
+  store.error(function(err){
+    if (!err) return;
+    var st = window.__iapState;
+    st.busy = false;
+    if (err.code === ErrorCode.PAYMENT_CANCELLED) { st.error = null; refreshUI(); return; }
+    st.error = iapErrorText(err);
+    iapLog('iap_error', { code: err.code, message: (err.message||'').slice(0,120) });
+    refreshUI();
+  });
+
+  function iapErrorText(err){
+    var c = err && err.code;
+    if (c === ErrorCode.PAYMENT_NOT_ALLOWED)   return 'Bu cihazda ödeme yapma izni kapalı. Cihaz ayarlarından (Ekran Süresi / Kısıtlamalar) satın almalara izin verin.';
+    if (c === ErrorCode.PRODUCT_NOT_AVAILABLE) return 'Abonelik şu anda mağazada bulunamadı. Lütfen daha sonra tekrar deneyin.';
+    if (c === ErrorCode.COMMUNICATION)         return 'Mağazaya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+    if (c === ErrorCode.STORE_BLOCKED)         return 'Cihazınızda mağaza satın almaları engellenmiş görünüyor (ebeveyn denetimi veya kurumsal kısıtlama).';
+    return 'İşlem tamamlanamadı. Lütfen daha sonra tekrar deneyin.';
+  }
+
+  /* ---------------- Dışa açılan işlemler ---------------- */
+  window.iapSubscribe = function(){
+    var st = window.__iapState;
+    if (st.busy) return;
+    var p = getProduct();
+    if (!p) { st.error = 'Abonelik bilgisi yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.'; refreshUI(); return; }
+    if (p.owned) { syncOwnership('already-owned'); return; }
+
+    var offer = null;
+    try { offer = p.getOffer ? p.getOffer() : (p.offers && p.offers[0]); } catch(e){}
+    if (!offer) { st.error = 'Abonelik seçeneği bulunamadı. Lütfen daha sonra tekrar deneyin.'; refreshUI(); return; }
+
+    st.busy = true; st.error = null; refreshUI();
+    iapLog('iap_subscribe_started', { product: PRODUCT_ID, trial: !!(st.trial && st.trialEligible) });
+
+    store.order(offer).then(function(result){
+      st.busy = false;
+      if (result && result.isError) {
+        if (result.code !== ErrorCode.PAYMENT_CANCELLED) st.error = iapErrorText(result);
+      } else {
+        iapLog('iap_subscribe_completed', { product: PRODUCT_ID });
+      }
+      refreshUI();
+    }).catch(function(){
+      st.busy = false;
+      st.error = 'İşlem tamamlanamadı. Lütfen tekrar deneyin.';
+      refreshUI();
+    });
+  };
+
+  /* Apple Yönerge 3.1.1 gereği ZORUNLU. */
+  window.iapRestorePurchases = function(){
+    var st = window.__iapState;
+    if (st.busy) return;
+    st.busy = true; st.error = null; st.restoreDone = false; refreshUI();
+    iapLog('iap_restore_started', {});
+
+    Promise.resolve(store.restorePurchases()).then(function(err){
+      st.busy = false;
+      if (err && err.isError && err.code !== ErrorCode.PAYMENT_CANCELLED) st.error = iapErrorText(err);
+      else st.restoreDone = true;
+      syncOwnership('restore');
+    }).catch(function(){
+      st.busy = false;
+      st.error = 'Geri yükleme tamamlanamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+      refreshUI();
+    });
+  };
+
+  /* Aboneliği yönet/iptal et — Apple 3.1.2 gereği erişilebilir olmalı.
+     Kullanıcıyı mağazanın abonelik yönetim ekranına götürür. */
+  window.iapManageSubscription = function(){
+    try { store.manageSubscriptions(); } catch(e){}
+  };
+
+  /* ---------------- Başlatma ---------------- */
+  try {
+    store.verbosity = CdvPurchase.LogLevel.ERROR;
+    store.initialize([Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY]).then(function(){
+      syncOwnership('init');
+    }).catch(function(){
+      var st = window.__iapState;
+      st.loading = false; st.available = false; st.reason = 'init-failed';
+      refreshUI();
+    });
+  } catch(e){
+    var st0 = window.__iapState;
+    st0.loading = false; st0.available = false; st0.reason = 'init-failed';
+  }
+
+  /* Uygulama öne geldiğinde tazele: başka cihazda yapılan iptal,
+     yenileme veya iade burada yakalanır. */
+  try {
+    if (Capacitor.Plugins && Capacitor.Plugins.App && Capacitor.Plugins.App.addListener) {
+      Capacitor.Plugins.App.addListener('appStateChange', function(s){
+        if (s && s.isActive) {
+          try { store.update().then(function(){ syncOwnership('foreground'); }); } catch(e){}
+        }
+      });
+    }
+  } catch(e){}
+  } /* startIap sonu */
+})();
+
 </script>
 </body>
 </html>
