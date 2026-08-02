@@ -34,6 +34,7 @@ PODFILE = os.path.join("ios", "App", "Podfile")
 
 MARKER = "# --- CI: Pod hedeflerinde kod imzalamayi kapat ---"
 PIN_MARKER = "# --- CI: Bagimlilik surum sabitleme ---"
+FRAMEWORKS_MARKER = "# --- CI: static framework linkage (FirebaseCore modul hatasi icin) ---"
 
 # ---------------------------------------------------------------------------
 # NEDEN SURUM SABITLEME GEREKLI?
@@ -53,16 +54,34 @@ PIN_MARKER = "# --- CI: Bagimlilik surum sabitleme ---"
 # Bu, derlemenin "dun calisiyordu bugun calismiyor" davranisinin da
 # sebebidir: kodda hicbir sey degismese bile Google yeni surum yayinladiginda
 # derleme kirilir.
-#
-# COZUM: UMP'yi eklentinin destekledigi 2.x serisine sabitlemek.
-# '~> 2.0' ifadesi 2.x serisinin en guncel surumunu secer, 3.0'a gecmez.
 # ---------------------------------------------------------------------------
 PINNED_PODS = """
   """ + PIN_MARKER + """
-  # UMP 3.x, Swift API isimlerini degistirdigi icin @capacitor-community/admob
-  # ile uyumsuz. 2.x serisine sabitliyoruz. Ayrinti icin bu dosyanin basina bakin.
   pod 'GoogleUserMessagingPlatform', '~> 3.1.0'
 """
+
+# ---------------------------------------------------------------------------
+# NEDEN use_frameworks! :linkage => :static GEREKLI?
+#
+# @capacitor-firebase/analytics paketinin Swift dosyalari
+# (FirebaseAnalytics.swift) "import FirebaseCore" satirini icerir.
+# Firebase SDK'lari Swift modulu (XCFramework) olarak dagitilir. Ayni
+# projede AdMob / UMP gibi statik XCFramework tabanli baska pod'lar da
+# oldugu icin, CocoaPods'un varsayilan dinamik framework baglamasi
+# (sadece "use_frameworks!") bazen Firebase'in modulunu dogru sekilde
+# expose edemez ve arsivleme su hatayla coker:
+#
+#     "no such module 'FirebaseCore'"
+#
+# COZUM: Frameworks'leri STATIK olarak baglamak. Bu, Firebase dahil
+# tum Swift modullerinin dogru sekilde bulunmasini saglar ve AdMob gibi
+# statik XCFramework'lerle de uyumludur.
+#
+# Podfile'da zaten "use_frameworks!" varsa (parametresiz ya da farkli bir
+# parametreyle), bu satiri ":linkage => :static" ile degistiriyoruz.
+# Hic yoksa, en basa yeni bir satir olarak ekliyoruz.
+# ---------------------------------------------------------------------------
+STATIC_FRAMEWORKS_LINE = "use_frameworks! :linkage => :static  " + FRAMEWORKS_MARKER
 
 SIGNING_SNIPPET = """
   """ + MARKER + """
@@ -93,6 +112,36 @@ def log(msg):
     print("[patch-podfile] %s" % msg)
 
 
+def patch_use_frameworks(content):
+    """Podfile'daki use_frameworks! satirini statik linkage'a zorlar."""
+    if FRAMEWORKS_MARKER in content:
+        log("Static framework linkage yamasi zaten mevcut, atlandi.")
+        return content, False
+
+    # Var olan "use_frameworks!" satirini bul (parametreli ya da parametresiz).
+    match = re.search(r"^\s*use_frameworks!.*$", content, re.MULTILINE)
+
+    if match:
+        content = content[:match.start()] + STATIC_FRAMEWORKS_LINE + content[match.end():]
+        log("Mevcut 'use_frameworks!' satiri statik linkage'a "
+            "(':linkage => :static') donusturuldu (FirebaseCore modul "
+            "hatasini onlemek icin).")
+        return content, True
+
+    # Hic yoksa, "target 'App' do" bloguna, ondan hemen once ekle.
+    target_match = re.search(r"^target ['\"]App['\"] do\s*$", content, re.MULTILINE)
+    if target_match:
+        insert_at = target_match.start()
+        content = content[:insert_at] + STATIC_FRAMEWORKS_LINE + "\n\n" + content[insert_at:]
+        log("'use_frameworks!' satiri Podfile'da yoktu; statik linkage ile "
+            "yeni eklendi (FirebaseCore modul hatasini onlemek icin).")
+        return content, True
+
+    log("UYARI: 'use_frameworks!' eklenecek uygun bir konum bulunamadi "
+        "(ne var olan satir ne de \"target 'App' do\" blogu bulundu).")
+    return content, False
+
+
 def main():
     if not os.path.exists(PODFILE):
         log("HATA: %s bulunamadi." % PODFILE)
@@ -112,14 +161,17 @@ def main():
         if target_match:
             insert_at = target_match.end()
             content = content[:insert_at] + "\n" + PINNED_PODS + content[insert_at:]
-            log("GoogleUserMessagingPlatform '~> 2.0' olarak sabitlendi "
-                "(UMP 3.x Swift API degisikligi nedeniyle).")
+            log("GoogleUserMessagingPlatform '~> 3.1.0' olarak sabitlendi.")
             changed = True
         else:
             log("UYARI: \"target 'App' do\" blogu bulunamadi; surum sabitleme "
                 "eklenemedi. Podfile yapisi beklenenden farkli olabilir.")
 
-    # ---- 2) Kod imzalamayi kapat ----
+    # ---- 2) use_frameworks! satirini statik linkage'a zorla ----
+    content, fw_changed = patch_use_frameworks(content)
+    changed = changed or fw_changed
+
+    # ---- 3) Kod imzalamayi kapat ----
     if MARKER in content:
         log("Imzalama yamasi zaten mevcut, atlandi.")
         if changed:
