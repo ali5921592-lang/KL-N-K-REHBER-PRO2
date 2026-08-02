@@ -303,3 +303,60 @@ bir native proje yerine, her zaman doğru ve güncel bir yapı garanti eder.
 Paket adını değiştirmek isterseniz `capacitor.config.json` içindeki `appId`
 alanını güncelleyin (Play Store'a ilk yüklemeden ÖNCE yapılmalıdır; sonradan
 değiştirilemez).
+
+
+---
+
+## Kaynak Gösterim Sistemi (App Store Yönerge 1.4.1)
+
+Uygulamadaki tüm tıbbi içerik için tıklanabilir kaynak bağlantıları gösterilir.
+İlgili kod `www/index.html` içinde **"KAYNAK / REFERANS MODÜLÜ"** başlığı altındadır.
+
+| Sembol | Görevi |
+|---|---|
+| `SOURCES` | 32 resmî kaynağın başlık/kurum/yıl/URL kaydı |
+| `SOURCES_LAST_REVIEW` | Bağlantıların son kontrol tarihi (ekranlarda gösterilir) |
+| `sourceBox(keys, extraHtml, title)` | Bir ekranın altına kaynak kutusu basar |
+| `topicSourceBox(title, text)` | Hastalık/bakım başlığından konuyu tanıyıp uygun kılavuzu seçer |
+| `drugSourceBox(generic, ad, yuksekRisk, lasa)` | İlaç için TİTCK + etken maddeye özel DailyMed bağlantısı üretir |
+| `TOPIC_SOURCES` | Anahtar kelime → kılavuz eşleştirme tablosu |
+| `viewSources()` | Merkezi "Kaynaklar" ekranı (`goto('sources')`) |
+
+**Yeni kaynak eklemek:** `SOURCES` nesnesine `{t, p, y, u}` alanlarıyla bir kayıt ekleyin,
+sonra ilgili `sourceBox([...])` çağrısına anahtarını yazın.
+
+**Yeni bir hastalık konusu eşleştirmek:** `TOPIC_SOURCES` dizisine
+`{kw:['anahtarkelime'], keys:['kaynakanahtari']}` ekleyin. Anahtar kelimeler **küçük harfle
+ve Türkçe karakterlerle** yazılmalıdır (`srcNorm` normalizasyonu uygulanır).
+
+> ⚠️ Kaynak bağlantıları periyodik olarak kontrol edilmeli, kırık bağlantılar
+> güncellenmeli ve `SOURCES_LAST_REVIEW` tarihi yenilenmelidir.
+
+## Uygulama İçi Satın Alma (App Store Yönerge 2.1(b))
+
+Uygulamada **gerçek bir uygulama içi satın alma** vardır: "Reklamsız Abonelik"
+(otomatik yenilenen aylık abonelik + ilk hafta ücretsiz deneme).
+
+| Sembol / dosya | Görevi |
+|---|---|
+| `PREMIUM_IAP_ENABLED` | Satın alma arayüzünün ana anahtarı |
+| `window.IAP_CONFIG` | Ürün kimliği ve yasal bağlantılar |
+| `renderIapSection()` | Ayarlar ekranındaki satın alma kartı |
+| `window.iapSubscribe()` | Abonelik akışını başlatır |
+| `window.iapManageSubscription()` | Mağazanın abonelik yönetim ekranını açar |
+| `window.iapRestorePurchases()` | Satın alımları geri yükler (Apple 3.1.1 gereği zorunlu) |
+| `window.__iapState` | Arayüzün okuduğu durum (fiyat, dönem, deneme, uygunluk, hata) |
+| `cordova-plugin-purchase` | StoreKit + Google Play Billing 9 eklentisi |
+
+**Kurulum adımları `ABONELIK_KURULUM.md` dosyasındadır.** Aboneliği ve ücretsiz deneme
+teklifini App Store Connect ve Play Console'da oluşturmadan hiçbiri çalışmaz.
+
+> **Ücretsiz deneme kodla yapılmaz**, mağaza panelinde "teklif" olarak tanımlanır.
+> Uygulama denemeyi mağazadan okur ve düğme metnini ("1 hafta ücretsiz dene" /
+> "Abone Ol") kullanıcının uygunluğuna göre otomatik ayarlar.
+
+> ⚠️ `IAP_CONFIG.legalUrls.privacy` şu anda örnek bir adrestir; **kendi gizlilik politikanızın
+> adresiyle değiştirilmelidir**, aksi halde Apple reddeder.
+
+> ⏰ Google, 31 Ağustos 2026'dan itibaren Billing Library 8+ şartı koyuyor. Kullanılan
+> eklenti sürümü Billing 9 ile derlenir; eski sürüme düşürmeyin.
