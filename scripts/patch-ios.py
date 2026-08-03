@@ -79,7 +79,7 @@ def patch_info_plist():
 
     # iPad'de tam ekran zorunlulugu KALDIRILIR (Split View / Slide Over destegi icin).
     plist.pop("UIRequiresFullScreen", None)
-
+    plist["GADApplicationIdentifier"] = "ca-app-pub-7996356702191225~2940143624"
     with open(INFO_PLIST_PATH, "wb") as f:
         plistlib.dump(plist, f)
     log("Info.plist guncellendi: ITSAppUsesNonExemptEncryption=false, "
