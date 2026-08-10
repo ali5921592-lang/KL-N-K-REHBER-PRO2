@@ -79,7 +79,13 @@ def patch_info_plist():
 
     # iPad'de tam ekran zorunlulugu KALDIRILIR (Split View / Slide Over destegi icin).
     plist.pop("UIRequiresFullScreen", None)
-    plist["GADApplicationIdentifier"] = "ca-app-pub-7996356702191225~2940143624"
+
+    # NOT: GADApplicationIdentifier BU SCRIPT TARAFINDAN YAZILMAZ.
+    # Daha once burada sabit kodlanmis bir AdMob App ID vardi; bu script
+    # workflow'da patch-ads.py'den SONRA calistigi icin ad-config.json'a
+    # yazilan deger sessizce eziliyordu. Reklam kimliklerinin TEK kaynagi
+    # ad-config.json olmalidir (bkz. scripts/patch-ads.py).
+
     with open(INFO_PLIST_PATH, "wb") as f:
         plistlib.dump(plist, f)
     log("Info.plist guncellendi: ITSAppUsesNonExemptEncryption=false, "
