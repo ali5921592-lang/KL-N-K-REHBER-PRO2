@@ -211,6 +211,35 @@
   .iap-legal{text-align:left;}
   .iap-badge{display:inline-block;background:var(--blue-700);color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;vertical-align:middle;margin-left:4px;}
   .iap-trial{background:#F0FDF4;border:1px solid #86EFAC;color:#166534;border-radius:10px;padding:10px 12px;font-size:11.5px;line-height:1.6;margin-bottom:12px;}
+
+  /* --- Reklam sonrasi abonelik teklifi (alt sayfa / bottom sheet) --- */
+  .offer-backdrop{position:fixed;inset:0;background:rgba(8,14,28,.55);z-index:9998;display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .22s ease;}
+  .offer-backdrop.show{opacity:1;}
+  .offer-sheet{width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(8,14,28,.28);transform:translateY(100%);transition:transform .26s cubic-bezier(.22,.9,.3,1);max-height:88vh;overflow-y:auto;}
+  .offer-backdrop.show .offer-sheet{transform:translateY(0);}
+  .offer-grip{width:38px;height:4px;border-radius:999px;background:var(--line);margin:0 auto 14px;}
+  .offer-title{font-family:'Manrope',sans-serif;font-size:17px;font-weight:800;color:var(--ink);line-height:1.35;}
+  .offer-sub{font-size:12.5px;color:var(--ink-2);line-height:1.6;margin-top:6px;}
+  .offer-price{font-size:20px;font-weight:800;color:var(--ink);margin:12px 0 2px;}
+  .offer-price small{font-size:12px;font-weight:600;color:var(--ink-2);}
+  .offer-bullets{list-style:none;padding:0;margin:12px 0 4px;}
+  .offer-bullets li{font-size:12.5px;color:var(--ink-2);line-height:1.75;padding-left:20px;position:relative;}
+  .offer-bullets li:before{content:'✓';position:absolute;left:0;color:var(--blue-700);font-weight:800;}
+  .offer-buy{width:100%;margin-top:14px;padding:14px;border:none;border-radius:12px;background:var(--blue-700);color:#fff;font-size:15px;font-weight:800;font-family:'Manrope',sans-serif;cursor:pointer;}
+  .offer-buy[disabled]{opacity:.55;cursor:default;}
+  .offer-later{width:100%;margin-top:8px;padding:12px;border:none;border-radius:12px;background:transparent;color:var(--ink-2);font-size:13.5px;font-weight:600;cursor:pointer;}
+  .offer-legal{font-size:10.5px;color:var(--ink-2);line-height:1.6;margin-top:12px;}
+  .offer-legal a{color:var(--blue-700);text-decoration:underline;}
+  .offer-deco{text-align:center;font-size:15px;letter-spacing:.35em;opacity:.85;margin:0 0 10px;user-select:none;}
+  .offer-free{background:var(--green-bg);border:1px solid var(--green);color:var(--green);border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.65;margin:14px 0 2px;font-weight:500;}
+  .offer-price-note{font-size:11px;color:var(--ink-2);margin-top:2px;}
+  .offer-thanks{text-align:center;font-size:12.5px;color:var(--ink-2);font-weight:600;margin-top:14px;}
+  .offer-legal-short{font-size:11px;color:var(--ink-2);line-height:1.6;text-align:center;}
+  .offer-terms{margin-top:8px;}
+  .offer-terms summary{list-style:none;cursor:pointer;font-size:11px;color:var(--ink-2);text-align:center;padding:6px 0;opacity:.75;text-decoration:underline;}
+  .offer-terms summary::-webkit-details-marker{display:none;}
+  .offer-terms-body{font-size:10.5px;color:var(--ink-2);line-height:1.65;padding:8px 2px 0;}
+  .offer-links{margin-top:10px;text-align:center;}
 </style>
 </head>
 <body>
@@ -8203,7 +8232,11 @@ loadPersisted();
         return initAds();
       }
       return AdMob.requestConsentInfo({ tagForUnderAgeOfConsent: false }).then(function(consentInfo){
-        var REQUIRED = 1; // ConsentStatus.REQUIRED (eklenti enum degeri)
+        /* DUZELTME: @capacitor-community/admob bu degeri SAYI degil METIN
+           olarak dondurur ("REQUIRED" / "NOT_REQUIRED" / "OBTAINED" / "UNKNOWN").
+           Onceki kod sayisal 1 ile karsilastirdigi icin kosul hicbir zaman
+           saglanmiyor ve AB kullanicilarina riza formu HIC gosterilmiyordu. */
+        var REQUIRED = 'REQUIRED';
         if (consentInfo && consentInfo.isConsentFormAvailable && consentInfo.status === REQUIRED) {
           return AdMob.showConsentForm().catch(function(){});
         }
@@ -8489,6 +8522,8 @@ loadPersisted();
       state.premium = owned;
       try { if (typeof savePremium === 'function') savePremium(); } catch(e){}
       try { if (typeof window.__adsBridgeOnPremiumChange === 'function') window.__adsBridgeOnPremiumChange(owned); } catch(e){}
+      /* Abonelik aktiflesince reklam sonrasi teklif penceresi aciksa kapat. */
+      try { if (owned && typeof window.__offerCloseOnPremium === 'function') window.__offerCloseOnPremium(); } catch(e){}
       iapLog('premium_status_changed', { premium: owned, source: sourceLabel || 'store' });
     }
     refreshUI();
@@ -8622,6 +8657,258 @@ loadPersisted();
   } /* startIap sonu */
 })();
 
+</script>
+<script>
+/* ================================================================
+   REKLAM SONRASI ABONELİK TEKLİFİ
+   ----------------------------------------------------------------
+   Geçiş (interstitial) reklamı KAPANDIKTAN sonra, kullanıcıya
+   reklamsız aboneliği öneren bir alt sayfa (bottom sheet) açar.
+
+   TASARIM KARARLARI:
+   • Yalnızca GEÇİŞ reklamından sonra açılır. Ödüllü reklamdan sonra
+     ASLA açılmaz — kullanıcı onu isteyerek izlemiştir, ödülünü
+     alırken paywall görmesi kötü bir deneyimdir.
+   • Banner reklamıyla ilgisi yoktur (banner zaten sürekli ekranda).
+   • Sıklık aşağıdaki iki ayarla sınırlandırılmıştır. Her reklamdan
+     sonra açılmasını isterseniz SIKLIK değerini 1 yapın.
+   • "Şimdi değil" denirse o gün bir daha gösterilmez.
+   • Abone olan kullanıcılarda ve reklamlar kapalıyken hiç çalışmaz.
+
+   Apple Yönerge 3.1.2 gereği pencerede ZORUNLU olarak bulunanlar:
+   abonelik adı, süresi, mağazadan okunan gerçek fiyat, otomatik
+   yenileme açıklaması ve Gizlilik Politikası / Kullanım Koşulları
+   bağlantıları. Bu alanları silmeyin — silinirse uygulama reddedilir.
+   ================================================================ */
+(function(){
+  'use strict';
+
+  /* ---------------- AYARLAR ---------------- */
+  var SIKLIK            = 2;   /* Kaç geçiş reklamında bir gösterilsin (1 = her reklamdan sonra) */
+  var GUNLUK_MAKS       = 3;   /* Aynı gün en fazla kaç kez gösterilsin */
+  var ACILMA_GECIKMESI  = 450; /* Reklam kapandıktan kaç ms sonra açılsın */
+
+  /* ---------------- PENCEREDEKİ METİNLER ----------------
+     Buradaki yazıları serbestçe değiştirebilirsiniz.
+     SADECE "yenileme" ve yasal bağlantılar bölümüne dokunmayın —
+     onlar Apple Yönerge 3.1.2 gereği zorunludur, silinirse
+     uygulama reddedilir. */
+  var METIN = {
+    /* Üstteki süsleme şeridi. Emoji dizisini değiştirebilir veya
+       tamamen boş bırakabilirsiniz: deco: '' */
+    deco: '🌿  🌸  💙  🌸  🌿',
+
+    /* Ücretsiz deneme uygunsa gösterilecek başlık ({SURE} = "1 hafta") */
+    baslikDeneme: 'İlk {SURE} bizden 💙',
+
+    /* Denemesi olmayan kullanıcıya gösterilecek başlık */
+    baslik: 'Bu rehberi ayakta tutan sizsiniz 💙',
+
+    /* Başlığın altındaki açıklama */
+    aciklama: 'Klinik Rehber Pro, sahada çalışan sağlık profesyonelleri için ' +
+              'hazırlandı ve gelişmeye devam ediyor. Abone olduğunuzda reklamlar ' +
+              'tamamen kalkar; aynı zamanda yeni klinik içeriklerin eklenmesine ve ' +
+              'uygulamanın daha iyi olmasına doğrudan destek olursunuz.',
+
+    /* Yeşil kutu — verilen söz. Bunu tutmanız çok önemli. */
+    ucretsizSozu: 'Abone olmasanız da hiçbir şey kısıtlanmaz. Tüm klinik bilgiler, ' +
+                  'ilaç dozları, hesaplayıcılar ve kaynaklar herkese <b>her zaman ' +
+                  'ücretsizdir</b>. Bilgiye erişimi asla paranın arkasına koymayacağız.',
+
+    /* Madde listesi — istediğiniz kadar satır ekleyip çıkarabilirsiniz */
+    maddeler: [
+      'Banner ve sayfa geçişi reklamları tamamen kalkar',
+      'Yeni içerik ve güncellemelere destek olursunuz',
+      'Tüm klinik içerik ücretsiz kalmaya devam eder',
+      'İstediğiniz zaman tek dokunuşla iptal edebilirsiniz'
+    ],
+
+    /* Butonlar ({SURE} = deneme süresi) */
+    btnDeneme: '{SURE} ücretsiz dene',
+    btnAbone:  'Abone Ol ve Destek Ol',
+    btnSonra:  'Şimdi değil, teşekkürler',
+
+    /* En altta, yasal metnin hemen üstünde küçük bir kapanış cümlesi */
+    kapanis: 'Emeğinize sağlık — iyi nöbetler. 🌷'
+  };
+
+  var CAP     = window.Capacitor;
+  var Plugins = (CAP && CAP.Plugins) || {};
+  var isNative = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+
+  if (!isNative || !Plugins.AdMob) return;   /* Tarayıcıda çalışmaz */
+
+  var K_SAYAC  = 'offer_ad_counter';
+  var K_GUNLUK = 'offer_daily';   /* {"g":"2026-08-10","n":2,"skip":false} */
+
+  function bugun(){
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+  }
+  function oku(key, varsayilan){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : varsayilan;
+    } catch(e){ return varsayilan; }
+  }
+  function yaz(key, deger){
+    try { localStorage.setItem(key, JSON.stringify(deger)); } catch(e){}
+  }
+  function gunlukDurum(){
+    var d = oku(K_GUNLUK, null);
+    if (!d || d.g !== bugun()) { d = { g: bugun(), n: 0, skip: false }; }
+    return d;
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ---------------- Gösterilmeli mi? ---------------- */
+  function gosterilebilirMi(){
+    /* Abone olan veya reklamları kapalı olan kullanıcıya asla gösterme. */
+    try {
+      if (typeof state !== 'undefined') {
+        if (state.premium) return false;
+        if (state.adEnabled === false) return false;
+      }
+    } catch(e){}
+
+    /* Mağaza hazır değilse (fiyat yoksa) teklif gösterme — boş kutu çıkmasın. */
+    var s = window.__iapState;
+    if (!s || !s.available || s.owned || !s.price) return false;
+
+    /* Hassas ekranlarda (CPR/acil/doz/hesaplayıcı) gösterme. */
+    try { if (typeof isAdSensitiveView === 'function' && isAdSensitiveView()) return false; } catch(e){}
+
+    var d = gunlukDurum();
+    if (d.skip) return false;              /* Kullanıcı bugün "Şimdi değil" dedi */
+    if (d.n >= GUNLUK_MAKS) return false;  /* Günlük sınır doldu */
+
+    return true;
+  }
+
+  /* ---------------- Pencereyi çiz ---------------- */
+  var backdrop = null;
+
+  function kapat(kullaniciReddetti){
+    if (kullaniciReddetti){
+      var d = gunlukDurum();
+      d.skip = true;
+      yaz(K_GUNLUK, d);
+    }
+    if (!backdrop) return;
+    backdrop.classList.remove('show');
+    var el = backdrop;
+    backdrop = null;
+    setTimeout(function(){ try { el.remove(); } catch(e){} }, 260);
+  }
+
+  function ac(){
+    if (backdrop) return;
+    var s   = window.__iapState || {};
+    var cfg = window.IAP_CONFIG || {};
+    var legal = cfg.legalUrls || {};
+    /* Mağaza adı cihaza göre yazılır: iPhone/iPad'de App Store,
+       Android'de Google Play. Platform belirlenemezse ikisi birden. */
+    var _plat  = (CAP && CAP.getPlatform && CAP.getPlatform()) || '';
+    var MAGAZA = _plat === 'ios' ? 'App Store'
+               : _plat === 'android' ? 'Google Play'
+               : 'App Store / Google Play';
+
+    var donem     = s.period || 'ay';
+    var denemeVar = !!(s.trial && s.trialEligible);
+
+    /* {SURE} yer tutucusunu mağazadan okunan gerçek deneme süresiyle degistir. */
+    function sure(t){ return String(t || '').replace('{SURE}', esc(s.trial || '')); }
+
+    var btnMetin = denemeVar ? sure(METIN.btnDeneme) : METIN.btnAbone;
+    var baslik   = denemeVar ? sure(METIN.baslikDeneme) : METIN.baslik;
+
+    var maddeler = (METIN.maddeler || []).map(function(m){
+      return '<li>' + m + '</li>';
+    }).join('');
+
+    var yenileme = 'Ödeme, satın almayı onayladığınızda ' + MAGAZA + ' hesabınıza yansıtılır. '
+      + 'Abonelik, mevcut dönem bitmeden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. '
+      + 'Aboneliğinizi ' + MAGAZA + ' hesap ayarlarınızdan istediğiniz zaman yönetebilir veya iptal edebilirsiniz.'
+      + (denemeVar
+          ? (' Deneme süresi bitmeden en az 24 saat önce iptal etmezseniz abonelik '
+             + esc(s.price) + ' / ' + esc(donem) + ' üzerinden başlar.')
+          : '');
+
+    var baglantilar = '';
+    if (legal.privacy) baglantilar += '<a href="' + esc(legal.privacy) + '">Gizlilik Politikası</a>';
+    if (legal.privacy && legal.terms) baglantilar += ' &middot; ';
+    if (legal.terms)   baglantilar += '<a href="' + esc(legal.terms) + '">Kullanım Koşulları</a>';
+
+    backdrop = document.createElement('div');
+    backdrop.className = 'offer-backdrop';
+    backdrop.innerHTML =
+      '<div class="offer-sheet" role="dialog" aria-modal="true" aria-label="Reklamsız abonelik teklifi">' +
+        '<div class="offer-grip"></div>' +
+        (METIN.deco ? ('<div class="offer-deco">' + METIN.deco + '</div>') : '') +
+        '<div class="offer-title">' + baslik + '</div>' +
+        '<div class="offer-sub">' + METIN.aciklama + '</div>' +
+        (METIN.ucretsizSozu ? ('<div class="offer-free">' + METIN.ucretsizSozu + '</div>') : '') +
+        '<ul class="offer-bullets">' + maddeler + '</ul>' +
+        '<div class="offer-price">' + esc(s.price) + ' <small>/ ' + esc(donem) + '</small></div>' +
+        '<div class="offer-price-note">Klinik Rehber Pro — Reklamsız. Aylık, otomatik yenilenen abonelik.</div>' +
+        '<button class="offer-buy" id="offerBuyBtn">' + esc(btnMetin) + '</button>' +
+        '<button class="offer-later" id="offerLaterBtn">' + esc(METIN.btnSonra) + '</button>' +
+        (METIN.kapanis ? ('<div class="offer-thanks">' + METIN.kapanis + '</div>') : '') +
+        '<div class="offer-legal">' +
+          '<div class="offer-legal-short">Otomatik yenilenen abonelik &middot; İstediğiniz zaman ' + MAGAZA + ' hesap ayarlarınızdan iptal edebilirsiniz.</div>' +
+          '<details class="offer-terms"><summary>Abonelik koşullarının tamamı</summary>' +
+            '<div class="offer-terms-body">' + yenileme + '</div>' +
+          '</details>' +
+          (baglantilar ? ('<div class="offer-links">' + baglantilar + '</div>') : '') +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(backdrop);
+    /* Arka plana dokununca kapat (reddetme sayılmaz, sadece kapatır). */
+    backdrop.addEventListener('click', function(ev){
+      if (ev.target === backdrop) kapat(false);
+    });
+    backdrop.querySelector('#offerLaterBtn').addEventListener('click', function(){ kapat(true); });
+    backdrop.querySelector('#offerBuyBtn').addEventListener('click', function(){
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = 'İşleniyor…';
+      try { window.iapSubscribe && window.iapSubscribe(); } catch(e){}
+      /* Satın alma akışı mağazanın kendi ekranında devam eder; pencereyi kapat. */
+      setTimeout(function(){ kapat(false); }, 600);
+    });
+
+    /* Animasyon için bir sonraki kareyi bekle. */
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ if (backdrop) backdrop.classList.add('show'); });
+    });
+
+    var d = gunlukDurum();
+    d.n = (d.n || 0) + 1;
+    yaz(K_GUNLUK, d);
+  }
+
+  /* ---------------- Reklam kapanışını dinle ---------------- */
+  function reklamKapandi(){
+    var sayac = (oku(K_SAYAC, 0) || 0) + 1;
+    yaz(K_SAYAC, sayac);
+    if (SIKLIK > 1 && (sayac % SIKLIK) !== 0) return;
+    if (!gosterilebilirMi()) return;
+    setTimeout(function(){ if (gosterilebilirMi()) ac(); }, ACILMA_GECIKMESI);
+  }
+
+  try {
+    Plugins.AdMob.addListener('interstitialAdDismissed', reklamKapandi);
+  } catch(e){}
+
+  /* Abonelik satın alınırsa açık pencereyi hemen kapat. */
+  window.__offerCloseOnPremium = function(){ kapat(false); };
+})();
 </script>
 </body>
 </html>
