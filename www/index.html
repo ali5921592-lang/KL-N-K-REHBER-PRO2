@@ -7725,8 +7725,8 @@ function renderIapSection(){
     <div class="iap-title">Klinik Rehber Pro — Reklamsız${showTrial? ` <span class="iap-badge">${s.trial} ücretsiz</span>` : ''}</div>
     <div class="field-val">Aylık abonelikle uygulamadaki tüm reklamlar kapanır.</div>
     <ul class="iap-benefits">
-      <li>Alt banner reklamı tamamen kalkar</li>
-      <li>Sayfa geçişlerinde reklam gösterilmez</li>
+      <li>Sayfa geçişlerinde çıkan tam ekran reklamlar kalkar</li>
+      <li>Uygulama boyunca hiç reklam görmezsiniz</li>
       <li>Tüm klinik içerik ve hesaplayıcılar aynen kalır</li>
       <li>İstediğiniz zaman iptal edebilirsiniz</li>
     </ul>
@@ -8173,8 +8173,8 @@ loadPersisted();
     var interstitialReady = false;
     var rewardedReady = false;
     var lastKnownView = null;
-    var MIN_INTERSTITIAL_GAP_MS = 3 * 60 * 1000; // en az 3 dakika
-    var MIN_SECTIONS_BEFORE_AD = 3 + Math.floor(Math.random() * 3); // 3-5 farkli bolum gezildikten sonra (rastgele)
+    var MIN_INTERSTITIAL_GAP_MS = 2 * 60 * 1000; // en az 2 dakika
+    var MIN_SECTIONS_BEFORE_AD = 2 + Math.floor(Math.random() * 3); // 2-4 farkli bolum gezildikten sonra (rastgele)
     var sessionStartAt = Date.now();
     var STARTUP_GRACE_MS = 20 * 1000; // uygulama acilir acilmaz reklam gosterme
 
@@ -8717,7 +8717,7 @@ loadPersisted();
 
     /* Madde listesi — istediğiniz kadar satır ekleyip çıkarabilirsiniz */
     maddeler: [
-      'Banner ve sayfa geçişi reklamları tamamen kalkar',
+      'Sayfa geçişlerinde çıkan tam ekran reklamlar kalkar',
       'Yeni içerik ve güncellemelere destek olursunuz',
       'Tüm klinik içerik ücretsiz kalmaya devam eder',
       'İstediğiniz zaman tek dokunuşla iptal edebilirsiniz'
