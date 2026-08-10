@@ -1,16 +1,17 @@
 {
-  "_readme": "Bu dosya, uygulamanın tüm AdMob reklam kimliklerinin TEK kaynağıdır. Gerçek reklam kimliklerinizi buraya girip commit ettiğinizde, bir sonraki derlemede otomatik olarak Android/iOS projesine ve web uygulamasına işlenir (scripts/patch-ads.py tarafından). Varsayılan değerler Google'ın resmi TEST reklam kimlikleridir — gerçek reklam almazlar, güvenle test için kullanılabilir. Gerçek reklam kimliklerinizi girdikten sonra 'testMode' alanını da false yapmayı unutmayın, aksi halde uygulama gerçek kimliklerle bile test modunda kalır.",
-  "testMode": true,
+  "_readme": "Bu dosya, uygulamanin TUM AdMob reklam kimliklerinin TEK kaynagidir. Asagidaki 8 alani apps.admob.com'dan aldiginiz GERCEK kimliklerle degistirin ve testMode degerini false yapin. Commit ettiginizde bir sonraki derlemede otomatik olarak Android Manifest'e, iOS Info.plist'e ve web uygulamasina islenir (scripts/patch-ads.py). appId degerlerinin ortasinda ~ isareti, reklam birimi kimliklerinin ortasinda / isareti bulunur.",
+  "_uyari": "testMode true kaldigi surece GERCEK kimlikleri girseniz bile uygulama test reklami gosterir ve gelir getirmez. Yayina cikmadan once mutlaka false yapin.",
+  "testMode": false,
   "android": {
-    "appId": "ca-app-pub-3940256099942544~3347511713",
-    "bannerId": "ca-app-pub-3940256099942544/6300978111",
-    "interstitialId": "ca-app-pub-3940256099942544/1033173712",
-    "rewardedId": "ca-app-pub-3940256099942544/5224354917"
+    "appId": "ca-app-pub-7996356702191225~2269771773",
+    "bannerId": "ca-app-pub-7996356702191225/7793561198",
+    "interstitialId": "ca-app-pub-7996356702191225/7945036217",
+    "rewardedId": "ca-app-pub-7996356702191225/9912724000"
   },
   "ios": {
-    "appId": "ca-app-pub-3940256099942544~1458002511",
-    "bannerId": "ca-app-pub-3940256099942544/2934735716",
-    "interstitialId": "ca-app-pub-3940256099942544/4411468910",
-    "rewardedId": "ca-app-pub-3940256099942544/1712485313"
+    "appId": "ca-app-pub-7996356702191225~2940143624",
+    "bannerId": "ca-app-pub-7996356702191225/2864099920",
+    "interstitialId": "ca-app-pub-7996356702191225/7924854918",
+    "rewardedId": "ca-app-pub-7996356702191225/5298691574"
   }
 }
