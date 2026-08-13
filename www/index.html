@@ -7700,11 +7700,25 @@ function renderIapSection(){
     </div>`;
   }
 
+  /* Mağazadan ürün bilgisi alınamadı — sonsuz "yükleniyor" yerine
+     net bir mesaj ve tekrar deneme imkânı sun. */
+  if (!s.price && !s.loading){
+    return `<div class="section-title">⭐ Reklamsız Abonelik</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="iap-title">Klinik Rehber Pro — Reklamsız</div>
+      <div class="field-val" style="margin-top:6px;">Aylık abonelikle uygulamadaki tüm reklamlar kapanır. Tüm klinik içerik abone olmayan kullanıcılar için de ücretsiz kalır.</div>
+      <div class="field-val" style="margin-top:10px;">Abonelik bilgisi şu anda mağazadan alınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.</div>
+      <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="window.iapRetryLoad&&window.iapRetryLoad()">Tekrar Dene</button>
+      <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">${s.busy? 'İşleniyor…' : 'Satın Alımları Geri Yükle'}</button>
+      <div class="iap-legal">${legalLinks}</div>
+    </div>`;
+  }
+
   const donem     = s.period || 'ay';
   const showTrial = !!(s.trial && s.trialEligible);
   const priceLine = s.price
       ? `${s.price} / ${donem}`
-      : (s.loading ? 'Fiyat yükleniyor…' : 'Fiyat alınamadı');
+      : 'Fiyat yükleniyor…';
   const canBuy    = !!s.price && !s.busy && !s.loading;
   const btnLabel  = s.busy ? 'İşleniyor…' : (showTrial ? `${s.trial} ücretsiz dene` : 'Abone Ol');
 
@@ -7752,7 +7766,7 @@ function viewSettings(){
   <div class="card">
     <div class="list-row"><span class="name">Reklam Durumu</span><span class="val">${(!isNative)? 'Devre dışı (tarayıcı)' : (state.premium? (PREMIUM_IAP_ENABLED? 'Devre dışı (Premium)' : 'Devre dışı') : (state.adEnabled? 'Etkin' : 'Devre dışı'))}</span></div>
   </div>
-  <div class="pdf-note">CPR/acil müdahale, ilaç dozu ve hesaplayıcı sayfalarında geçiş reklamı hiçbir zaman gösterilmez. Reklamlar yalnızca doğal sayfa geçişlerinde, en az 3 dakika arayla gösterilir.</div>
+  <div class="pdf-note">CPR/acil müdahale, ilaç dozu ve hesaplayıcı sayfalarında geçiş reklamı hiçbir zaman gösterilmez. Reklamlar yalnızca doğal sayfa geçişlerinde, en az 2 dakika arayla gösterilir.</div>
 
   ${isNative? `
   <div class="section-title" style="margin-top:20px;">🔒 Gizlilik</div>
@@ -8513,7 +8527,9 @@ loadPersisted();
     st.period        = off.period;
     st.trial         = off.trial;
     st.trialEligible = trialEligible(p);
-    st.loading       = false;
+    /* Fiyat geldiyse yükleme bitti; gelmediyse zaman aşımı devrede kalsın. */
+    if (off.price) { st.loading = false; st.reason = null; }
+    else if (sourceLabel === 'retry' || sourceLabel === 'update') { st.loading = false; st.reason = 'no-products'; }
     try { st.expiry = (p && p.expiryDate) ? new Date(p.expiryDate) : null; } catch(e){ st.expiry = null; }
 
     if (typeof state === 'undefined') { refreshUI(); return; }
@@ -8628,11 +8644,58 @@ loadPersisted();
     try { store.manageSubscriptions(); } catch(e){}
   };
 
+  /* Mağaza bilgisini yeniden çekmeyi dener (kullanıcı "Tekrar Dene"ye
+     bastığında veya ilk deneme fiyat getiremediğinde çağrılır). */
+  window.iapRetryLoad = function(){
+    var st = window.__iapState;
+    if (st.busy) return;
+    st.loading = true; st.error = null; st.reason = null; refreshUI();
+    startLoadTimeout();
+    try {
+      Promise.resolve(store.update()).then(function(){
+        syncOwnership('retry');
+      }).catch(function(){
+        var s2 = window.__iapState;
+        s2.loading = false; s2.reason = 'no-products'; refreshUI();
+      });
+    } catch(e){
+      st.loading = false; st.reason = 'no-products'; refreshUI();
+    }
+  };
+
+  /* ---- Yükleme zaman aşımı ----
+     store.initialize() bazı ortamlarda (mağazaya ulaşılamayan cihaz,
+     hesabı olmayan test ortamı) ne çözülür ne de reddedilir. Bu durumda
+     arayüz sonsuza kadar "Fiyat yükleniyor…" ekranında kalırdı; Apple
+     incelemesi bunu 2.1(b) "ürünler yüklenmedi" olarak işaretliyor.
+     Aşağıdaki zaman aşımı, arayüzün her koşulda net bir duruma
+     düşmesini ve kullanıcıya "Tekrar Dene" sunulmasını sağlar. */
+  var LOAD_TIMEOUT_MS = 15000;
+  var loadTimer = null;
+  function startLoadTimeout(){
+    if (loadTimer) clearTimeout(loadTimer);
+    loadTimer = setTimeout(function(){
+      var st = window.__iapState;
+      if (st && st.loading && !st.price) {
+        st.loading = false;
+        st.reason  = 'no-products';
+        iapLog('iap_load_timeout', { product: PRODUCT_ID });
+        refreshUI();
+      }
+    }, LOAD_TIMEOUT_MS);
+  }
+
   /* ---------------- Başlatma ---------------- */
+  startLoadTimeout();
   try {
     store.verbosity = CdvPurchase.LogLevel.ERROR;
     store.initialize([Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY]).then(function(){
       syncOwnership('init');
+      /* initialize çözüldü ama ürün gelmediyse bir kez daha dene. */
+      var st = window.__iapState;
+      if (!st.price) {
+        try { Promise.resolve(store.update()).then(function(){ syncOwnership('update'); }).catch(function(){}); } catch(e){}
+      }
     }).catch(function(){
       var st = window.__iapState;
       st.loading = false; st.available = false; st.reason = 'init-failed';
