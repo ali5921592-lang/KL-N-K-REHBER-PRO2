@@ -7707,7 +7707,11 @@ function renderIapSection(){
     <div class="card" style="margin-bottom:14px;">
       <div class="iap-title">Klinik Rehber Pro — Reklamsız</div>
       <div class="field-val" style="margin-top:6px;">Aylık abonelikle uygulamadaki tüm reklamlar kapanır. Tüm klinik içerik abone olmayan kullanıcılar için de ücretsiz kalır.</div>
-      <div class="field-val" style="margin-top:10px;">Abonelik bilgisi şu anda mağazadan alınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.</div>
+      <div class="field-val" style="margin-top:10px;">${
+        s.reason === 'offline'
+          ? 'Cihazınız çevrimdışı görünüyor. Abonelik fiyatı App Store\'dan alındığı için internet bağlantısı gerekir. Bağlantınızı açıp tekrar deneyin.'
+          : 'Abonelik bilgisi şu anda mağazadan alınamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.'
+      }</div>
       <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="window.iapRetryLoad&&window.iapRetryLoad()">Tekrar Dene</button>
       <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">${s.busy? 'İşleniyor…' : 'Satın Alımları Geri Yükle'}</button>
       <div class="iap-legal">${legalLinks}</div>
@@ -8670,7 +8674,7 @@ loadPersisted();
      incelemesi bunu 2.1(b) "ürünler yüklenmedi" olarak işaretliyor.
      Aşağıdaki zaman aşımı, arayüzün her koşulda net bir duruma
      düşmesini ve kullanıcıya "Tekrar Dene" sunulmasını sağlar. */
-  var LOAD_TIMEOUT_MS = 15000;
+  var LOAD_TIMEOUT_MS = 8000;
   var loadTimer = null;
   function startLoadTimeout(){
     if (loadTimer) clearTimeout(loadTimer);
@@ -8678,12 +8682,24 @@ loadPersisted();
       var st = window.__iapState;
       if (st && st.loading && !st.price) {
         st.loading = false;
-        st.reason  = 'no-products';
-        iapLog('iap_load_timeout', { product: PRODUCT_ID });
+        /* Cihaz çevrimdışıysa (uçak modu / ağ yok) bunu ayrıca belirt:
+           mağazadan fiyat çekmek internet bağlantısı gerektirir. */
+        st.reason  = (navigator && navigator.onLine === false) ? 'offline' : 'no-products';
+        iapLog('iap_load_timeout', { product: PRODUCT_ID, reason: st.reason });
         refreshUI();
       }
     }, LOAD_TIMEOUT_MS);
   }
+
+  /* Bağlantı geri geldiğinde otomatik olarak yeniden dene. */
+  try {
+    window.addEventListener('online', function(){
+      var st = window.__iapState;
+      if (st && st.available && !st.price && !st.owned) {
+        if (typeof window.iapRetryLoad === 'function') window.iapRetryLoad();
+      }
+    });
+  } catch(e){}
 
   /* ---------------- Başlatma ---------------- */
   startLoadTimeout();
