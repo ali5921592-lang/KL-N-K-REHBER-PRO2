@@ -8388,7 +8388,8 @@ loadPersisted();
 /* ================================================================
    ABONELİK KÖPRÜSÜ (cordova-plugin-purchase v13)
 
-   ÜRÜN: Aylık, otomatik yenilenen abonelik + ilk hafta ücretsiz deneme.
+   ÜRÜN: Aylık, otomatik yenilenen abonelik. Ücretsiz deneme yalnızca
+   App Store Connect'te Introductory Offer tanımlıysa gösterilir.
 
    ⚠️ ÜCRETSİZ DENEME KODLA YAPILMAZ.
    Deneme süresi, mağaza panellerinde "teklif" (offer) olarak
@@ -8704,8 +8705,18 @@ loadPersisted();
   /* ---------------- Başlatma ---------------- */
   startLoadTimeout();
   try {
+    /* Üretimde ürün yükleme hatasını teşhis edebilmek için StoreKit hatası
+       uygulama loguna bırakılır; kullanıcı arayüzünde ham hata gösterilmez. */
     store.verbosity = CdvPurchase.LogLevel.ERROR;
-    store.initialize([Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY]).then(function(){
+    /* iOS'ta yalnızca Apple adapter'ını başlat. Desteklenmeyen Google adapter'ı
+       iOS ürün sorgusuna karışmamalıdır. */
+    var activePlatform = (Capacitor.getPlatform && Capacitor.getPlatform()) || '';
+    var initPlatforms = activePlatform === 'ios'
+      ? [Platform.APPLE_APPSTORE]
+      : activePlatform === 'android'
+        ? [Platform.GOOGLE_PLAY]
+        : [Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY];
+    store.initialize(initPlatforms).then(function(){
       syncOwnership('init');
       /* initialize çözüldü ama ürün gelmediyse bir kez daha dene. */
       var st = window.__iapState;

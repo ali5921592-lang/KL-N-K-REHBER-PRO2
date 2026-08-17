@@ -355,7 +355,7 @@ ve Türkçe karakterlerle** yazılmalıdır (`srcNorm` normalizasyonu uygulanır
 ## Uygulama İçi Satın Alma (App Store Yönerge 2.1(b))
 
 Uygulamada **gerçek bir uygulama içi satın alma** vardır: "Reklamsız Abonelik"
-(otomatik yenilenen aylık abonelik + ilk hafta ücretsiz deneme).
+(otomatik yenilenen aylık abonelik). Ücretsiz deneme yalnızca App Store Connect veya Play Console'da ilgili introductory offer/teklif tanımlıysa gösterilir.
 
 | Sembol / dosya | Görevi |
 |---|---|
@@ -368,15 +368,17 @@ Uygulamada **gerçek bir uygulama içi satın alma** vardır: "Reklamsız Abonel
 | `window.__iapState` | Arayüzün okuduğu durum (fiyat, dönem, deneme, uygunluk, hata) |
 | `cordova-plugin-purchase` | StoreKit + Google Play Billing 9 eklentisi |
 
-**Kurulum adımları `ABONELIK_KURULUM.md` dosyasındadır.** Aboneliği ve ücretsiz deneme
-teklifini App Store Connect ve Play Console'da oluşturmadan hiçbiri çalışmaz.
+Aboneliğin çalışması için ürünün App Store Connect ve Play Console'da oluşturulması,
+ürün fiyatının tanımlanması ve ilgili uygulama sürümüyle incelemeye gönderilmesi gerekir.
+Ücretsiz deneme sunulacaksa introductory offer/teklif ayrıca mağaza panelinde oluşturulmalıdır.
 
 > **Ücretsiz deneme kodla yapılmaz**, mağaza panelinde "teklif" olarak tanımlanır.
 > Uygulama denemeyi mağazadan okur ve düğme metnini ("1 hafta ücretsiz dene" /
 > "Abone Ol") kullanıcının uygunluğuna göre otomatik ayarlar.
 
-> ⚠️ `IAP_CONFIG.legalUrls.privacy` şu anda örnek bir adrestir; **kendi gizlilik politikanızın
-> adresiyle değiştirilmelidir**, aksi halde Apple reddeder.
+> `IAP_CONFIG.legalUrls.privacy` ve `IAP_CONFIG.legalUrls.terms` canlı, tıklanabilir
+> gizlilik politikası ve Apple Standard EULA adresleridir. Bu adresler App Store metadata’sındaki
+> Privacy Policy ve Description bağlantılarıyla aynı tutulmalıdır.
 
 > ⏰ Google, 31 Ağustos 2026'dan itibaren Billing Library 8+ şartı koyuyor. Kullanılan
 > eklenti sürümü Billing 9 ile derlenir; eski sürüme düşürmeyin.
