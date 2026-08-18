@@ -61,6 +61,9 @@ jobs:
       - name: NPM bagimliliklarini kur
         run: npm install
 
+      - name: Native PurchasePlugin init akisini yamala
+        run: python3 scripts/patch-purchase-plugin.py
+
       - name: Capacitor native IAP bridge bundle uret
         run: node scripts/build-iap-bridge.mjs
 
@@ -88,6 +91,9 @@ jobs:
 
       - name: CocoaPods bagimliliklarini da iceren senkronizasyon
         run: npx cap sync ios
+
+      - name: CocoaPods kopyasindaki PurchasePlugin init akisini dogrula ve yamala
+        run: python3 scripts/patch-purchase-plugin.py
 
       - name: AdMob Swift düzeltmesi
         run: python3 scripts/patch-admob-swift.py
@@ -180,7 +186,11 @@ jobs:
           grep -q 'com.klinikrehberpro.reklamsiz.aylik' www/index.html
           grep -q 'CapacitorNativeBridge' www/cdv-purchase.bundle.js
           grep -q 'registerPlugin' www/cdv-purchase.bundle.js
-          echo "IAP native capability, iOS 15 target ve Capacitor bridge dogrulandi."
+          grep -q 'LOAD_TIMEOUT_MS = 8000' www/index.html
+          grep -q 'p.raw.price' www/index.html
+          test -f node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
+          grep -q 'Product metadata loading must not wait' node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
+          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout ve native init patch dogrulandi."
 
       - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
         if: steps.signing-check.outputs.has_signing == 'true'
@@ -266,9 +276,11 @@ jobs:
           test -f "$APP/public/cdv-purchase.bundle.js"
           test -f "$APP/public/purchase-bridge-bootstrap.js"
           grep -q 'com.klinikrehberpro.reklamsiz.aylik' "$APP/public/index.html"
+          grep -q 'LOAD_TIMEOUT_MS = 8000' "$APP/public/index.html"
+          grep -q 'p.raw.price' "$APP/public/index.html"
           grep -q 'CapacitorNativeBridge' "$APP/public/cdv-purchase.bundle.js"
           echo "IPA metadata dogrulandi: Bundle ID=$BUNDLE_ID MinimumOSVersion=$MIN_OS"
-          echo "IAP web bundle ve product ID IPA icinde mevcut."
+          echo "IAP web bundle, product ID, timeout ve raw-price fallback IPA icinde mevcut."
           echo "- IPA doğrulaması: Bundle ID \`$BUNDLE_ID\`, MinimumOSVersion \`$MIN_OS\`, IAP bridge/product ID mevcut" >> "$GITHUB_STEP_SUMMARY"
           rm -rf "$TMP_IPA_AUDIT"
 

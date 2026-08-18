@@ -8487,6 +8487,26 @@ loadPersisted();
   var ErrorCode   = CdvPurchase.ErrorCode;
   var PRODUCT_ID  = window.IAP_CONFIG.productId;
 
+  /* Timeout’u startIap() içindeki herhangi bir senkron plugin/API hatasından
+     önce kur. Böylece store.when(), register() veya bridge proxy beklenmedik
+     biçimde throw etse bile UI sonsuza kadar loading kalmaz. */
+  var LOAD_TIMEOUT_MS = 8000;
+  var loadTimer = null;
+  function startLoadTimeout(){
+    if (loadTimer) clearTimeout(loadTimer);
+    loadTimer = setTimeout(function(){
+      var st = window.__iapState;
+      if (st && st.loading && !st.price){
+        st.loading = false;
+        st.reason = (navigator && navigator.onLine === false) ? 'offline' : 'no-products';
+        iapLog('iap_load_timeout', { product: PRODUCT_ID, reason: st.reason });
+        refreshUI();
+      }
+    }, LOAD_TIMEOUT_MS);
+  }
+  startLoadTimeout();
+  iapLog('iap_start', { product: PRODUCT_ID, platform: (Capacitor.getPlatform && Capacitor.getPlatform()) || '' });
+
   function getProduct(){
     try {
       return store.get(PRODUCT_ID, Platform.APPLE_APPSTORE)
@@ -8532,6 +8552,14 @@ loadPersisted();
     /* Aşama bilgisi yoksa ürünün düz alanlarına düş. */
     if (!out.price && p.pricing && p.pricing.price) out.price = p.pricing.price;
     if (!out.period && p.billingPeriod) out.period = periodText(p.billingPeriod);
+
+    /* Native StoreKit 2 bridge’in ham ürün sözlüğü de fiyat içerir. Offer
+       dönüşümü beklenmedik biçimde boş kalsa bile, doğrulanmış native fiyatı
+       kullanıcıya göstermek için son fallback olarak bunu kullan. */
+    if (!out.price && p.raw){
+      out.price = p.raw.price || p.raw.displayPrice || null;
+      if (!out.period && p.raw.billingPeriod) out.period = periodText(p.raw.billingPeriod);
+    }
     return out;
   }
 
@@ -8712,29 +8740,7 @@ loadPersisted();
     }
   };
 
-  /* ---- Yükleme zaman aşımı ----
-     store.initialize() bazı ortamlarda (mağazaya ulaşılamayan cihaz,
-     hesabı olmayan test ortamı) ne çözülür ne de reddedilir. Bu durumda
-     arayüz sonsuza kadar "Fiyat yükleniyor…" ekranında kalırdı; Apple
-     incelemesi bunu 2.1(b) "ürünler yüklenmedi" olarak işaretliyor.
-     Aşağıdaki zaman aşımı, arayüzün her koşulda net bir duruma
-     düşmesini ve kullanıcıya "Tekrar Dene" sunulmasını sağlar. */
-  var LOAD_TIMEOUT_MS = 8000;
-  var loadTimer = null;
-  function startLoadTimeout(){
-    if (loadTimer) clearTimeout(loadTimer);
-    loadTimer = setTimeout(function(){
-      var st = window.__iapState;
-      if (st && st.loading && !st.price) {
-        st.loading = false;
-        /* Cihaz çevrimdışıysa (uçak modu / ağ yok) bunu ayrıca belirt:
-           mağazadan fiyat çekmek internet bağlantısı gerektirir. */
-        st.reason  = (navigator && navigator.onLine === false) ? 'offline' : 'no-products';
-        iapLog('iap_load_timeout', { product: PRODUCT_ID, reason: st.reason });
-        refreshUI();
-      }
-    }, LOAD_TIMEOUT_MS);
-  }
+  /* Timeout yukarıda, startIap() gövdesinin en başında kuruldu. */
 
   /* Bağlantı geri geldiğinde otomatik olarak yeniden dene. */
   try {
@@ -8754,16 +8760,41 @@ loadPersisted();
     store.verbosity = CdvPurchase.LogLevel.ERROR;
     /* iOS'ta yalnızca Apple adapter'ını başlat. Desteklenmeyen Google adapter'ı
        iOS ürün sorgusuna karışmamalıdır. */
-    store.initialize(initPlatforms).then(function(){
+    store.initialize(initPlatforms).then(function(initErrors){
+      var st = window.__iapState;
+      var errors = Array.isArray(initErrors) ? initErrors.filter(Boolean) : [];
+      if (errors.length){
+        var first = errors[0] || {};
+        st.loading = false;
+        st.reason = 'no-products';
+        st.error = iapErrorText(first);
+        iapLog('iap_initialize_errors', {
+          count: errors.length,
+          code: first.code || null,
+          message: (first.message || '').toString().slice(0, 160)
+        });
+        refreshUI();
+        return;
+      }
+      iapLog('iap_initialize_resolved', {
+        productCount: (store.products && store.products.length) || 0
+      });
       syncOwnership('init');
       /* initialize çözüldü ama ürün gelmediyse bir kez daha dene. */
-      var st = window.__iapState;
       if (!st.price) {
-        try { Promise.resolve(store.update()).then(function(){ syncOwnership('update'); }).catch(function(){}); } catch(e){}
+        try { Promise.resolve(store.update()).then(function(){ syncOwnership('update'); }).catch(function(err){
+          st.loading = false; st.reason = 'no-products';
+          iapLog('iap_update_error', { message: (err && err.message || '').toString().slice(0, 160) });
+          refreshUI();
+        }); } catch(e){
+          st.loading = false; st.reason = 'no-products'; refreshUI();
+        }
       }
-    }).catch(function(){
+    }).catch(function(err){
       var st = window.__iapState;
       st.loading = false; st.available = false; st.reason = 'init-failed';
+      st.error = 'Satın alma servisi başlatılamadı. Lütfen daha sonra tekrar deneyin.';
+      iapLog('iap_initialize_rejected', { message: (err && err.message || '').toString().slice(0, 160) });
       refreshUI();
     });
   } catch(e){
