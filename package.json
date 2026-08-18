@@ -20,10 +20,11 @@
     "@capacitor/splash-screen": "^6.0.3",
     "@capacitor/status-bar": "^6.0.2",
     "@capacitor-community/admob": "^6.2.0",
-    "cordova-plugin-purchase": "13.18.0"
+    "capacitor-plugin-cdv-purchase": "13.18.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^6.2.0"
+    "@capacitor/cli": "^6.2.0",
+    "esbuild": "^0.25.0"
   }
 }

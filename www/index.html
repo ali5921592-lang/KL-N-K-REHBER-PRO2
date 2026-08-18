@@ -243,11 +243,12 @@
 </style>
 </head>
 <body>
-<!-- Capacitor, Cordova plugin dosyalarını native projeye kopyalar; ancak
-     statik HTML uygulamasında Cordova runtime açıkça yüklenmezse
-     cordova-plugin-purchase'ın CdvPurchase globali hiç oluşmaz ve
-     paywall sonsuza kadar "Fiyat yükleniyor…" durumunda kalır. -->
-<script src="cordova.js"></script>
+<!-- Capacitor native purchase bridge.
+     The bundle is generated from capacitor-plugin-cdv-purchase during CI.
+     It registers the native PurchasePlugin and exposes window.CdvPurchase
+     before the application IAP module starts. -->
+<script src="cdv-purchase.bundle.js"></script>
+<script src="purchase-bridge-bootstrap.js"></script>
 <div id="app"></div>
 
 <!-- ============================================================
@@ -8391,7 +8392,7 @@ loadPersisted();
 
 <script>
 /* ================================================================
-   ABONELİK KÖPRÜSÜ (cordova-plugin-purchase v13)
+   ABONELİK KÖPRÜSÜ (capacitor-plugin-cdv-purchase v13)
 
    ÜRÜN: Aylık, otomatik yenilenen abonelik. Ücretsiz deneme yalnızca
    App Store Connect'te Introductory Offer tanımlıysa gösterilir.
@@ -8427,9 +8428,9 @@ loadPersisted();
   };
 
   /* ---- Eklentinin hazır olmasını bekle ----
-     cordova-plugin-purchase, Capacitor'ın Cordova uyumluluk katmanı
-     üzerinden yüklenir; `CdvPurchase` genel değişkeni ancak
-     `deviceready` olayından sonra oluşur. */
+     Capacitor native PurchasePlugin bundle’ı
+     üzerinden yüklenir; `CdvPurchase` globali native bridge bootstrap’i
+     tamamladıktan sonra hazır olur. */
   function whenPluginReady(cb){
     if (window.CdvPurchase && window.CdvPurchase.store) { cb(); return; }
     var done = false, tries = 0;
@@ -8447,6 +8448,7 @@ loadPersisted();
       setTimeout(attempt, 200);
     }
     document.addEventListener('deviceready', attempt, { once:true });
+    window.addEventListener('cdvpurchase-ready', attempt, { once:true });
     attempt();
   }
 

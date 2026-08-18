@@ -61,6 +61,9 @@ jobs:
       - name: NPM bagimliliklarini kur
         run: npm install
 
+      - name: Capacitor native IAP bridge bundle uret
+        run: node scripts/build-iap-bridge.mjs
+
       # DUZELTME: ios/ klasoru repoda commit edilmis oldugu icin
       # "npx cap add ios" her calistiginda "platform already exists"
       # hatasi verip is akisini durduruyordu. Artik sadece klasor
