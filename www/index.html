@@ -243,6 +243,11 @@
 </style>
 </head>
 <body>
+<!-- Capacitor, Cordova plugin dosyalarını native projeye kopyalar; ancak
+     statik HTML uygulamasında Cordova runtime açıkça yüklenmezse
+     cordova-plugin-purchase'ın CdvPurchase globali hiç oluşmaz ve
+     paywall sonsuza kadar "Fiyat yükleniyor…" durumunda kalır. -->
+<script src="cordova.js"></script>
 <div id="app"></div>
 
 <!-- ============================================================
@@ -8550,12 +8555,28 @@ loadPersisted();
     refreshUI();
   }
 
-  /* ---- Ürün kaydı: aylık, otomatik yenilenen abonelik ---- */
+  /* ---- Platform ve ürün kaydı ----
+     Capacitor.getPlatform() native iOS/Android platformunu verir. Aynı ürünü
+     iki adapter'a kaydetmek yerine yalnızca çalışan mağazaya kaydetmek,
+     ürün sorgusunun yanlış adapter tarafından gölgelenmesini önler. */
+  var activePlatform = (Capacitor.getPlatform && Capacitor.getPlatform()) || '';
+  var isApplePlatform = activePlatform === 'ios';
+  var isGooglePlatform = activePlatform === 'android';
+  var initPlatforms = isApplePlatform
+    ? [Platform.APPLE_APPSTORE]
+    : isGooglePlatform
+      ? [Platform.GOOGLE_PLAY]
+      : [Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY];
+  var productRegistrations = isApplePlatform
+    ? [{ id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.APPLE_APPSTORE }]
+    : isGooglePlatform
+      ? [{ id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.GOOGLE_PLAY }]
+      : [
+          { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.APPLE_APPSTORE },
+          { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.GOOGLE_PLAY }
+        ];
   try {
-    store.register([
-      { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.APPLE_APPSTORE },
-      { id: PRODUCT_ID, type: ProductType.PAID_SUBSCRIPTION, platform: Platform.GOOGLE_PLAY }
-    ]);
+    store.register(productRegistrations);
   } catch(e){}
 
   store.when()
@@ -8710,12 +8731,6 @@ loadPersisted();
     store.verbosity = CdvPurchase.LogLevel.ERROR;
     /* iOS'ta yalnızca Apple adapter'ını başlat. Desteklenmeyen Google adapter'ı
        iOS ürün sorgusuna karışmamalıdır. */
-    var activePlatform = (Capacitor.getPlatform && Capacitor.getPlatform()) || '';
-    var initPlatforms = activePlatform === 'ios'
-      ? [Platform.APPLE_APPSTORE]
-      : activePlatform === 'android'
-        ? [Platform.GOOGLE_PLAY]
-        : [Platform.APPLE_APPSTORE, Platform.GOOGLE_PLAY];
     store.initialize(initPlatforms).then(function(){
       syncOwnership('init');
       /* initialize çözüldü ama ürün gelmediyse bir kez daha dene. */
