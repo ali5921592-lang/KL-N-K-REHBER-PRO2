@@ -234,6 +234,9 @@ jobs:
 
       - name: IPA'yi is akisi ciktisi olarak yukle
         if: steps.signing-check.outputs.has_signing == 'true'
+        # GitHub artifact kotası dolu olsa bile IPA'nın App Store Connect'e
+        # yüklenmesi engellenmemeli; ASC upload adımı bir sonraki adımdır.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: klinik-rehber-pro-ipa
