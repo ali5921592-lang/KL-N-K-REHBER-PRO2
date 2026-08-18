@@ -167,6 +167,21 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
+      - name: IAP native ayarlarini ve web bridge'ini dogrula
+        run: |
+          set -eu
+          PBX="ios/App/App.xcodeproj/project.pbxproj"
+          test -f "$PBX"
+          grep -q 'com.apple.InAppPurchase = {' "$PBX"
+          grep -q 'enabled = 1;' "$PBX"
+          grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;' "$PBX"
+          test -f www/cdv-purchase.bundle.js
+          test -f www/purchase-bridge-bootstrap.js
+          grep -q 'com.klinikrehberpro.reklamsiz.aylik' www/index.html
+          grep -q 'CapacitorNativeBridge' www/cdv-purchase.bundle.js
+          grep -q 'registerPlugin' www/cdv-purchase.bundle.js
+          echo "IAP native capability, iOS 15 target ve Capacitor bridge dogrulandi."
+
       - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
@@ -234,6 +249,28 @@ jobs:
           echo "### ✅ App Store'a Hazir IPA Uretildi" >> "$GITHUB_STEP_SUMMARY"
           echo "- Bundle ID: \`${{ steps.params.outputs.bundle_id }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Versiyon: \`${{ steps.params.outputs.version }}\` (Build \`${{ steps.params.outputs.build_number }}\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: IPA IAP ve metadata denetimi
+        if: steps.signing-check.outputs.has_signing == 'true'
+        run: |
+          set -eu
+          IPA=$(ls build/ipa/*.ipa | head -1)
+          TMP_IPA_AUDIT=$(mktemp -d)
+          unzip -q "$IPA" -d "$TMP_IPA_AUDIT"
+          APP=$(find "$TMP_IPA_AUDIT/Payload" -maxdepth 1 -name '*.app' -type d | head -1)
+          test -n "$APP"
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist")
+          test "$BUNDLE_ID" = "${{ steps.params.outputs.bundle_id }}"
+          test "$MIN_OS" = "15.0"
+          test -f "$APP/public/cdv-purchase.bundle.js"
+          test -f "$APP/public/purchase-bridge-bootstrap.js"
+          grep -q 'com.klinikrehberpro.reklamsiz.aylik' "$APP/public/index.html"
+          grep -q 'CapacitorNativeBridge' "$APP/public/cdv-purchase.bundle.js"
+          echo "IPA metadata dogrulandi: Bundle ID=$BUNDLE_ID MinimumOSVersion=$MIN_OS"
+          echo "IAP web bundle ve product ID IPA icinde mevcut."
+          echo "- IPA doğrulaması: Bundle ID \`$BUNDLE_ID\`, MinimumOSVersion \`$MIN_OS\`, IAP bridge/product ID mevcut" >> "$GITHUB_STEP_SUMMARY"
+          rm -rf "$TMP_IPA_AUDIT"
 
       - name: IPA'yi is akisi ciktisi olarak yukle
         if: steps.signing-check.outputs.has_signing == 'true'

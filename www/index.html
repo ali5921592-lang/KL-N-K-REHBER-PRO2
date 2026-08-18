@@ -8431,24 +8431,40 @@ loadPersisted();
      Capacitor native PurchasePlugin bundle’ı
      üzerinden yüklenir; `CdvPurchase` globali native bridge bootstrap’i
      tamamladıktan sonra hazır olur. */
+  function nativePurchasePluginReady(){
+    var cap = window.Capacitor;
+    var plugins = cap && cap.Plugins;
+    var plugin = plugins && plugins.PurchasePlugin;
+    return !!(window.__iapNativeBridgeReady &&
+      window.CdvPurchase && window.CdvPurchase.store &&
+      plugin && typeof plugin.init === 'function' &&
+      typeof plugin.load === 'function');
+  }
+
   function whenPluginReady(cb){
-    if (window.CdvPurchase && window.CdvPurchase.store) { cb(); return; }
     var done = false, tries = 0;
+    function fail(reason){
+      if (done) return;
+      done = true;
+      window.__iapState.available = false;
+      window.__iapState.loading = false;
+      window.__iapState.reason = reason || 'plugin-missing';
+      window.__iapState.error = 'Satın alma servisi başlatılamadı. Lütfen uygulamayı güncelleyip tekrar deneyin.';
+      iapLog('iap_bridge_unavailable', { reason: window.__iapState.reason });
+      refreshUI();
+    }
     function attempt(){
       if (done) return;
-      if (window.CdvPurchase && window.CdvPurchase.store) { done = true; cb(); return; }
+      if (nativePurchasePluginReady()) { done = true; cb(); return; }
       if (++tries > 100) {                       /* ~20 sn sonra vazgeç */
-        done = true;
-        window.__iapState.available = false;
-        window.__iapState.loading = false;
-        window.__iapState.reason = 'plugin-missing';
-        refreshUI();
+        fail(window.__iapNativeBridgeError ? 'plugin-missing' : 'native-plugin-not-ready');
         return;
       }
       setTimeout(attempt, 200);
     }
     document.addEventListener('deviceready', attempt, { once:true });
     window.addEventListener('cdvpurchase-ready', attempt, { once:true });
+    window.addEventListener('cdvpurchase-failed', function(){ fail('plugin-missing'); }, { once:true });
     attempt();
   }
 
@@ -8586,6 +8602,7 @@ loadPersisted();
       var p = getProduct(), off = readOffer(p), st = window.__iapState;
       st.price = off.price; st.period = off.period; st.trial = off.trial;
       st.trialEligible = trialEligible(p);
+      if (off.price) { st.loading = false; st.reason = null; }
       refreshUI();
     })
     /* Doğrulama sunucusu kullanılmadığı için işlem doğrudan
@@ -8603,6 +8620,10 @@ loadPersisted();
     var st = window.__iapState;
     st.busy = false;
     if (err.code === ErrorCode.PAYMENT_CANCELLED) { st.error = null; refreshUI(); return; }
+    if (st.loading && !st.price) {
+      st.loading = false;
+      st.reason = (err.code === ErrorCode.COMMUNICATION) ? 'offline' : 'no-products';
+    }
     st.error = iapErrorText(err);
     iapLog('iap_error', { code: err.code, message: (err.message||'').slice(0,120) });
     refreshUI();

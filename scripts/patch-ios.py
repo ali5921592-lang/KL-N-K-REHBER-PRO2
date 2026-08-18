@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
 """
 patch-ios.py
--------------
+------------
 Capacitor `npx cap add ios` ile tazece uretilen native iOS projesini,
 GitHub Actions icinde asagidaki sekilde otomatik duzenler:
 
-  1) Privacy Manifest dosyasini (PrivacyInfo.xcprivacy) projeye ekler
-     (Apple'in 2024+ App Store gereksinimi).
-  2) ITSAppUsesNonExemptEncryption = false ekler (uygulama ozel sifreleme
-     kullanmadigi icin - yalnizca standart HTTPS/local dosya erisimi).
+  1) Privacy Manifest dosyasini (PrivacyInfo.xcprivacy) projeye ekler.
+  2) ITSAppUsesNonExemptEncryption = false ekler.
   3) iPhone ve iPad icin uygun ekran yonu (orientation) destegini ayarlar.
-  4) Gereksiz izin/aciklama anahtarlarinin (kamera, konum, mikrofon vb.)
-     Info.plist'te bulunmadigini dogrular (varsayilan Capacitor sablonu
-     zaten bunlari icermez; uygulama hicbirini kullanmaz).
+  4) Gereksiz izin/aciklama anahtarlarini dogrular.
+  5) App ID hedefinde In-App Purchase capability kaydini ekler.
+  6) Native StoreKit 2 plugin'i iOS 15+ gerektirdigi icin uygulama
+     deployment target'ini 15.0'a ceker.
 
-NOT: Bundle Identifier, versiyon (CFBundleShortVersionString) ve build
-numarasi (CFBundleVersion) bu script yerine dogrudan `xcodebuild` build
-settings override'lari (PRODUCT_BUNDLE_IDENTIFIER, MARKETING_VERSION,
-CURRENT_PROJECT_VERSION) ile GitHub Actions workflow'unda ayarlanir.
-Bu, Xcode proje dosyasini (.pbxproj) elle/regex ile duzenlemekten çok
-daha guvenli ve standart bir yontemdir.
-
-Bu script yalnizca CI/CD tarafindan native ios/ klasoru uzerinde calisir;
-projenin www/ icindeki asil web uygulama kodunu HICBIR sekilde etkilemez.
+Bundle Identifier, versiyon ve build numarasi xcodebuild override'lariyla
+workflow tarafinda verilir. Bu script yalnizca CI/CD tarafindan native ios/
+klasoru uzerinde calisir.
 """
 import os
 import plistlib
@@ -31,8 +24,10 @@ import sys
 
 IOS_APP_DIR = os.path.join("ios", "App", "App")
 INFO_PLIST_PATH = os.path.join(IOS_APP_DIR, "Info.plist")
+PBXPROJ_PATH = os.path.join("ios", "App", "App.xcodeproj", "project.pbxproj")
 PRIVACY_MANIFEST_SRC = os.path.join("ios-privacy", "PrivacyInfo.xcprivacy")
 PRIVACY_MANIFEST_DST = os.path.join(IOS_APP_DIR, "PrivacyInfo.xcprivacy")
+MIN_IOS_VERSION = "15.0"
 
 
 def log(msg):
@@ -61,35 +56,80 @@ def patch_info_plist():
     with open(INFO_PLIST_PATH, "rb") as f:
         plist = plistlib.load(f)
 
-    # Sifreleme uyumluluk beyani: ozel/ek sifreleme kullanilmiyor.
     plist["ITSAppUsesNonExemptEncryption"] = False
-
-    # iPhone: dikey (portre) kullanim odakli bir referans/klinik uygulamasi.
     plist["UISupportedInterfaceOrientations"] = [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationPortraitUpsideDown",
     ]
-    # iPad: App Store inceleme kurallarina uygun olarak birden fazla yon desteklenir.
     plist["UISupportedInterfaceOrientations~ipad"] = [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationPortraitUpsideDown",
         "UIInterfaceOrientationLandscapeLeft",
         "UIInterfaceOrientationLandscapeRight",
     ]
-
-    # iPad'de tam ekran zorunlulugu KALDIRILIR (Split View / Slide Over destegi icin).
     plist.pop("UIRequiresFullScreen", None)
-
-    # NOT: GADApplicationIdentifier BU SCRIPT TARAFINDAN YAZILMAZ.
-    # Daha once burada sabit kodlanmis bir AdMob App ID vardi; bu script
-    # workflow'da patch-ads.py'den SONRA calistigi icin ad-config.json'a
-    # yazilan deger sessizce eziliyordu. Reklam kimliklerinin TEK kaynagi
-    # ad-config.json olmalidir (bkz. scripts/patch-ads.py).
 
     with open(INFO_PLIST_PATH, "wb") as f:
         plistlib.dump(plist, f)
     log("Info.plist guncellendi: ITSAppUsesNonExemptEncryption=false, "
         "iPhone/iPad ekran yonleri, UIRequiresFullScreen kaldirildi.")
+
+
+def patch_xcode_capabilities_and_deployment_target():
+    """Generated Capacitor target'a IAP capability ve iOS 15 target ekler."""
+    if not os.path.exists(PBXPROJ_PATH):
+        raise FileNotFoundError(
+            f"{PBXPROJ_PATH} bulunamadi; Capacitor iOS projesi olusturulmamis olabilir."
+        )
+
+    with open(PBXPROJ_PATH, "r", encoding="utf-8") as f:
+        project = f.read()
+
+    # The generated Capacitor project has one app TargetAttributes block with
+    # ProvisioningStyle. Add the capability exactly once and keep the patch
+    # idempotent for local reruns or future workflow changes.
+    capability_marker = "com.apple.InAppPurchase = {"
+    if capability_marker not in project:
+        needle = "\t\t\t\t\t\tProvisioningStyle = Automatic;\n"
+        if needle not in project:
+            raise RuntimeError(
+                "Xcode TargetAttributes/ProvisioningStyle bulunamadi; "
+                "In-App Purchase capability guvenli bicimde eklenemedi."
+            )
+        capability_block = (
+            needle
+            + "\t\t\t\t\t\tSystemCapabilities = {\n"
+            + "\t\t\t\t\t\t\tcom.apple.InAppPurchase = {\n"
+            + "\t\t\t\t\t\t\t\tenabled = 1;\n"
+            + "\t\t\t\t\t\t\t};\n"
+            + "\t\t\t\t\t\t};\n"
+        )
+        project = project.replace(needle, capability_block, 1)
+        log("Xcode target'ina com.apple.InAppPurchase capability'si eklendi.")
+    else:
+        log("Xcode target'inda com.apple.InAppPurchase zaten mevcut.")
+
+    old_target = "IPHONEOS_DEPLOYMENT_TARGET = 13.0;"
+    new_target = f"IPHONEOS_DEPLOYMENT_TARGET = {MIN_IOS_VERSION};"
+    replaced = project.count(old_target)
+    if replaced:
+        project = project.replace(old_target, new_target)
+        log(f"iOS deployment target {replaced} ayarda {MIN_IOS_VERSION} olarak guncellendi.")
+    elif new_target in project:
+        log(f"iOS deployment target zaten {MIN_IOS_VERSION}.")
+    else:
+        raise RuntimeError(
+            "IPHONEOS_DEPLOYMENT_TARGET bulunamadi; minimum iOS surumu dogrulanamadi."
+        )
+
+    if capability_marker not in project:
+        raise RuntimeError("In-App Purchase capability patch sonrasi dogrulanamadi.")
+    if new_target not in project:
+        raise RuntimeError("iOS 15 deployment target patch sonrasi dogrulanamadi.")
+
+    with open(PBXPROJ_PATH, "w", encoding="utf-8", newline="") as f:
+        f.write(project)
+    log("Xcode project capability ve deployment target dogrulamasi tamamlandi.")
 
 
 def verify_no_unnecessary_permissions():
@@ -108,6 +148,7 @@ def verify_no_unnecessary_permissions():
 def main():
     copy_privacy_manifest()
     patch_info_plist()
+    patch_xcode_capabilities_and_deployment_target()
     verify_no_unnecessary_permissions()
     log("iOS proje duzenlemeleri tamamlandi.")
 
