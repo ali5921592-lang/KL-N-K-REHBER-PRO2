@@ -7673,6 +7673,13 @@ function diagHtmlEscape(value){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function renderIapDiagnostics(){
+  /* Bu fonksiyon ana uygulama script’inde çalışır. Mobile bridge IIFE’sindeki
+     diagJson() burada scope içinde değildir; doğrudan çağrılırsa Ayarlar
+     ekranı render sırasında ReferenceError ile açılmaz. */
+  const formatDiag = value => {
+    try { return JSON.stringify(value == null ? null : value, null, 2); }
+    catch(e){ return String(value); }
+  };
   const cfg = window.IAP_CONFIG || {};
   if (!cfg.diagnostic) return '';
   const d = window.__iapDiag || {};
@@ -7701,9 +7708,9 @@ function renderIapDiagnostics(){
   return `<details class="iap-diagnostic" style="margin-top:12px;">
     <summary>Teknik tanı (yalnızca test build’i)</summary>
     <div class="pdf-note" style="margin-top:8px;">Bu panel Apple incelemesine gönderilecek yayın build’inde kapatılacaktır. Test sonucunu kopyalayıp gönderin.</div>
-    <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.35;background:#f4f6f8;padding:8px;border-radius:8px;margin-top:8px;">${diagHtmlEscape(diagJson(summary))}</pre>
-    <div class="pdf-note" style="margin-top:8px;"><b>Native validProducts</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(diagJson(valid))}</pre></div>
-    <div class="pdf-note" style="margin-top:8px;"><b>Native invalidProductIds</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(diagJson(invalid))}</pre></div>
+    <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.35;background:#f4f6f8;padding:8px;border-radius:8px;margin-top:8px;">${diagHtmlEscape(formatDiag(summary))}</pre>
+    <div class="pdf-note" style="margin-top:8px;"><b>Native validProducts</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(formatDiag(valid))}</pre></div>
+    <div class="pdf-note" style="margin-top:8px;"><b>Native invalidProductIds</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(formatDiag(invalid))}</pre></div>
     <div class="pdf-note" style="margin-top:8px;"><b>Native hata</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(nativeError || 'Yok')}</pre></div>
     <button class="btn-outline" style="width:100%;margin-top:8px;" onclick="window.copyIapDiagnostics&&window.copyIapDiagnostics()">Tanı Verisini Kopyala</button>
   </details>`;
