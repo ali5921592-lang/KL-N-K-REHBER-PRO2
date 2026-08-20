@@ -358,7 +358,10 @@ window.IAP_CONFIG = {
        (Yönerge 3.1.2). */
     privacy: 'https://ali5921592-lang.github.io/klinik-rehber-pro-privacy/',
     terms:   'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
-  }
+  },
+  /* Yalnızca TestFlight tanı build’inde true yapılır; App Review build’inde false olmalıdır. */
+  diagnostic: true,
+  diagnosticBuild: '73'
 };
 
 /* ============================================================
@@ -7664,6 +7667,48 @@ function viewABG(){
      • Gizlilik Politikası ve Kullanım Koşulları'na ÇALIŞAN bağlantılar
      • "Satın Alımları Geri Yükle" düğmesi (Yönerge 3.1.1)
    ============================================================ */
+function diagHtmlEscape(value){
+  return (value == null ? '—' : String(value))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function renderIapDiagnostics(){
+  const cfg = window.IAP_CONFIG || {};
+  if (!cfg.diagnostic) return '';
+  const d = window.__iapDiag || {};
+  const bridge = d.bridgeLoad || {};
+  const product = d.productUpdated || {};
+  const valid = d.nativeValidProducts || bridge.validProducts || [];
+  const invalid = d.nativeInvalidProductIds || bridge.invalidProductIds || [];
+  const nativeError = d.nativeLoadError || (bridge.status === 'error' ? bridge.message : null);
+  const storefront = d.storefront || {};
+  const init = d.storeInitialize || {};
+  const summary = {
+    build: cfg.diagnosticBuild || null,
+    productId: d.productId || (cfg && cfg.productId) || null,
+    platform: d.platform || null,
+    storefront: storefront.countryCode || storefront.status || null,
+    bridgeStatus: bridge.status || null,
+    validProductCount: Array.isArray(valid) ? valid.length : 0,
+    invalidProductIds: invalid,
+    nativeError: nativeError || null,
+    productUpdatedCount: product.count || 0,
+    storeProductCount: product.storeProductCount || null,
+    initializeStatus: init.status || null,
+    timeout: d.timeout ? d.timeout.status : null,
+    updatedAt: d.updatedAt || null
+  };
+  return `<details class="iap-diagnostic" style="margin-top:12px;">
+    <summary>Teknik tanı (yalnızca test build’i)</summary>
+    <div class="pdf-note" style="margin-top:8px;">Bu panel Apple incelemesine gönderilecek yayın build’inde kapatılacaktır. Test sonucunu kopyalayıp gönderin.</div>
+    <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.35;background:#f4f6f8;padding:8px;border-radius:8px;margin-top:8px;">${diagHtmlEscape(diagJson(summary))}</pre>
+    <div class="pdf-note" style="margin-top:8px;"><b>Native validProducts</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(diagJson(valid))}</pre></div>
+    <div class="pdf-note" style="margin-top:8px;"><b>Native invalidProductIds</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(diagJson(invalid))}</pre></div>
+    <div class="pdf-note" style="margin-top:8px;"><b>Native hata</b><pre style="white-space:pre-wrap;word-break:break-word;font-size:10px;">${diagHtmlEscape(nativeError || 'Yok')}</pre></div>
+    <button class="btn-outline" style="width:100%;margin-top:8px;" onclick="window.copyIapDiagnostics&&window.copyIapDiagnostics()">Tanı Verisini Kopyala</button>
+  </details>`;
+}
+
 function renderIapSection(){
   const s = window.__iapState || { available:false, reason:'plugin-missing' };
   const cfg = window.IAP_CONFIG || {};
@@ -7694,6 +7739,7 @@ function renderIapSection(){
       <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="window.iapManageSubscription&&window.iapManageSubscription()">Aboneliği Yönet / İptal Et</button>
       <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">${s.busy? 'İşleniyor…' : 'Satın Alımları Geri Yükle'}</button>
       <div class="iap-legal">${legalLinks}</div>
+      ${renderIapDiagnostics()}
     </div>`;
   }
 
@@ -7703,6 +7749,7 @@ function renderIapSection(){
     <div class="card" style="margin-bottom:14px;">
       <div class="field-val">Mağazaya şu anda bağlanılamıyor. İnternet bağlantınızı kontrol edip uygulamayı yeniden başlatmayı deneyin.</div>
       <button class="btn-restore" onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">Satın Alımları Geri Yükle</button>
+      ${renderIapDiagnostics()}
     </div>`;
   }
 
@@ -7721,6 +7768,7 @@ function renderIapSection(){
       <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="window.iapRetryLoad&&window.iapRetryLoad()">Tekrar Dene</button>
       <button class="btn-restore" ${s.busy?'disabled':''} onclick="window.iapRestorePurchases&&window.iapRestorePurchases()">${s.busy? 'İşleniyor…' : 'Satın Alımları Geri Yükle'}</button>
       <div class="iap-legal">${legalLinks}</div>
+      ${renderIapDiagnostics()}
     </div>`;
   }
 
@@ -7762,6 +7810,7 @@ function renderIapSection(){
     ${s.error? `<div class="iap-err">${esc(s.error)}</div>` : ''}
     ${(s.restoreDone && !s.owned && !s.error)? `<div class="iap-ok">Geri yüklenecek aktif abonelik bulunamadı. Daha önce abone olduysanız, o sırada kullandığınız hesapla giriş yaptığınızdan emin olun.</div>` : ''}
     <div class="iap-legal">${yenilemeMetni}<br/><br/>${legalLinks}</div>
+    ${renderIapDiagnostics()}
   </div>`;
 }
 
@@ -8477,6 +8526,60 @@ loadPersisted();
     try { if (typeof window.__iapLogEvent === 'function') window.__iapLogEvent(name, params||{}); } catch(e){}
   }
 
+  function diagEnabled(){
+    return !!(window.IAP_CONFIG && window.IAP_CONFIG.diagnostic);
+  }
+  function diagMerge(data){
+    if (!diagEnabled()) return;
+    try {
+      window.__iapDiag = Object.assign({}, window.__iapDiag || {}, data || {}, {
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e){}
+    refreshUI();
+  }
+  function diagJson(value){
+    try { return JSON.stringify(value == null ? null : value, null, 2); }
+    catch(e){ return String(value); }
+  }
+  window.copyIapDiagnostics = function(){
+    if (!diagEnabled()) return;
+    var text = diagJson(window.__iapDiag || {});
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+        iapLog('iap_diagnostics_copied', {});
+        return;
+      }
+    } catch(e){}
+    try { window.prompt('IAP tanı verisi', text); } catch(e){}
+  };
+
+  function loadDiagnosticStorefront(plugin){
+    if (!diagEnabled()) return;
+    if (!plugin || typeof plugin.getStorefront !== 'function') {
+      diagMerge({ storefront: { status:'unsupported', message:'getStorefront bridge metodu yok' } });
+      return;
+    }
+    diagMerge({ storefront: { status:'loading' } });
+    try {
+      Promise.resolve(plugin.getStorefront()).then(function(result){
+        diagMerge({ storefront: {
+          status:'success',
+          countryCode: result && result.countryCode ? result.countryCode : null,
+          raw: result || null
+        }});
+      }).catch(function(err){
+        diagMerge({ storefront: {
+          status:'error',
+          message: String(err && (err.message || err) || 'Storefront alınamadı').slice(0, 240)
+        }});
+      });
+    } catch(e){
+      diagMerge({ storefront: { status:'error', message:String(e && e.message || e).slice(0,240) } });
+    }
+  }
+
   whenPluginReady(function(){ startIap(); });
 
   function startIap(){
@@ -8486,6 +8589,19 @@ loadPersisted();
   var Platform    = CdvPurchase.Platform;
   var ErrorCode   = CdvPurchase.ErrorCode;
   var PRODUCT_ID  = window.IAP_CONFIG.productId;
+  var nativePlugin = Capacitor && Capacitor.Plugins && Capacitor.Plugins.PurchasePlugin;
+
+  diagMerge({
+    diagnosticBuild: (window.IAP_CONFIG && window.IAP_CONFIG.diagnosticBuild) || null,
+    productId: PRODUCT_ID,
+    platform: (Capacitor.getPlatform && Capacitor.getPlatform()) || null,
+    startedAt: new Date().toISOString(),
+    bridgeLoad: { status:'not-started', requestedProductIds:[PRODUCT_ID] },
+    storeInitialize: { status:'starting' },
+    productUpdated: { count:0 },
+    storeErrors: []
+  });
+  loadDiagnosticStorefront(nativePlugin);
 
   /* Timeout’u startIap() içindeki herhangi bir senkron plugin/API hatasından
      önce kur. Böylece store.when(), register() veya bridge proxy beklenmedik
@@ -8500,6 +8616,7 @@ loadPersisted();
         st.loading = false;
         st.reason = (navigator && navigator.onLine === false) ? 'offline' : 'no-products';
         iapLog('iap_load_timeout', { product: PRODUCT_ID, reason: st.reason });
+        diagMerge({ timeout: { status:'fired', reason: st.reason, at: new Date().toISOString() } });
         refreshUI();
       }
     }, LOAD_TIMEOUT_MS);
@@ -8631,6 +8748,25 @@ loadPersisted();
       st.price = off.price; st.period = off.period; st.trial = off.trial;
       st.trialEligible = trialEligible(p);
       if (off.price) { st.loading = false; st.reason = null; }
+      if (diagEnabled()) {
+        var d = window.__iapDiag || {};
+        diagMerge({
+          productUpdated: {
+            count: ((d.productUpdated && d.productUpdated.count) || 0) + 1,
+            storeProductCount: (store.products && store.products.length) || 0,
+            productFound: !!p,
+            parsedPrice: off.price || null,
+            parsedPeriod: off.period || null,
+            rawProduct: p && p.raw ? {
+              id: p.raw.id || null,
+              price: p.raw.price || p.raw.displayPrice || null,
+              currency: p.raw.currency || null,
+              billingPeriod: p.raw.billingPeriod || null,
+              billingPeriodUnit: p.raw.billingPeriodUnit || null
+            } : null
+          }
+        });
+      }
       refreshUI();
     })
     /* Doğrulama sunucusu kullanılmadığı için işlem doğrudan
@@ -8654,6 +8790,14 @@ loadPersisted();
     }
     st.error = iapErrorText(err);
     iapLog('iap_error', { code: err.code, message: (err.message||'').slice(0,120) });
+    if (diagEnabled()) {
+      var existingErrors = (window.__iapDiag && window.__iapDiag.storeErrors) || [];
+      diagMerge({ storeErrors: existingErrors.concat([{
+        code: err.code || null,
+        message: (err.message || '').toString().slice(0, 240),
+        at: new Date().toISOString()
+      }]).slice(-5) });
+    }
     refreshUI();
   });
 
@@ -8765,6 +8909,14 @@ loadPersisted();
       var errors = Array.isArray(initErrors) ? initErrors.filter(Boolean) : [];
       if (errors.length){
         var first = errors[0] || {};
+        diagMerge({ storeInitialize: {
+          status:'resolved-with-errors',
+          errorCount: errors.length,
+          firstError: {
+            code: first.code || null,
+            message: (first.message || '').toString().slice(0, 240)
+          }
+        }});
         st.loading = false;
         st.reason = 'no-products';
         st.error = iapErrorText(first);
@@ -8779,6 +8931,10 @@ loadPersisted();
       iapLog('iap_initialize_resolved', {
         productCount: (store.products && store.products.length) || 0
       });
+      diagMerge({ storeInitialize: {
+        status:'resolved',
+        productCount: (store.products && store.products.length) || 0
+      }});
       syncOwnership('init');
       /* capacitor-plugin-cdv-purchase v13.18.0 initialize() zaten
          kayıtlı ürünleri yükler ve productUpdated olayını yayınlar.
@@ -8789,11 +8945,19 @@ loadPersisted();
       st.loading = false; st.available = false; st.reason = 'init-failed';
       st.error = 'Satın alma servisi başlatılamadı. Lütfen daha sonra tekrar deneyin.';
       iapLog('iap_initialize_rejected', { message: (err && err.message || '').toString().slice(0, 160) });
+      diagMerge({ storeInitialize: {
+        status:'rejected',
+        message: (err && err.message || err || '').toString().slice(0, 240)
+      }});
       refreshUI();
     });
   } catch(e){
     var st0 = window.__iapState;
     st0.loading = false; st0.available = false; st0.reason = 'init-failed';
+    diagMerge({ storeInitialize: {
+      status:'threw',
+      message: String(e && e.message || e).slice(0, 240)
+    }});
   }
 
   /* Uygulama öne geldiğinde tazele: başka cihazda yapılan iptal,

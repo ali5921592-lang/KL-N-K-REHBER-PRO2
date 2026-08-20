@@ -194,7 +194,12 @@ jobs:
           test -f node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
           grep -q 'Product metadata loading must not wait' node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
           grep -q 'productsUpdated early before receipts' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
-          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout, native init patch ve early productsUpdated patch dogrulandi."
+          grep -q 'nativeValidProducts' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
+          grep -q 'upstream callback returned an array without resolving' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
+          grep -q 'diagnosticBuild' www/index.html
+          grep -q 'copyIapDiagnostics' www/index.html
+          grep -q 'nativeValidProducts' www/cdv-purchase.bundle.js
+          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout, native init patch, early productsUpdated patch, native load-error fix ve tanı paneli doğrulandı."
 
       - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
         if: steps.signing-check.outputs.has_signing == 'true'
