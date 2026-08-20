@@ -39,7 +39,9 @@ permissions:
 jobs:
   build:
     name: Build iOS App
-    runs-on: macos-26
+    # macos-26 runner tahsisi 20 Ağustos 2026’da adımlar başlamadan başarısız oldu.
+    # macos-15, Xcode/iOS archive için GitHub’ın kararlı hosted runner’ıdır.
+    runs-on: macos-15
 
     steps:
       - name: Kodu al (checkout)
