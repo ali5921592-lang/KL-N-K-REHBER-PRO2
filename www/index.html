@@ -8780,16 +8780,10 @@ loadPersisted();
         productCount: (store.products && store.products.length) || 0
       });
       syncOwnership('init');
-      /* initialize çözüldü ama ürün gelmediyse bir kez daha dene. */
-      if (!st.price) {
-        try { Promise.resolve(store.update()).then(function(){ syncOwnership('update'); }).catch(function(err){
-          st.loading = false; st.reason = 'no-products';
-          iapLog('iap_update_error', { message: (err && err.message || '').toString().slice(0, 160) });
-          refreshUI();
-        }); } catch(e){
-          st.loading = false; st.reason = 'no-products'; refreshUI();
-        }
-      }
+      /* capacitor-plugin-cdv-purchase v13.18.0 initialize() zaten
+         kayıtlı ürünleri yükler ve productUpdated olayını yayınlar.
+         Plugin başlangıçta store.update() çağrılmamasını özellikle önerir;
+         fiyat gelmezse 8 saniyelik timeout ve kullanıcı Retry akışı devrededir. */
     }).catch(function(err){
       var st = window.__iapState;
       st.loading = false; st.available = false; st.reason = 'init-failed';
