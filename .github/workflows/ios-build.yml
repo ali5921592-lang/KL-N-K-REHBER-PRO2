@@ -64,6 +64,9 @@ jobs:
       - name: Native PurchasePlugin init akisini yamala
         run: python3 scripts/patch-purchase-plugin.py
 
+      - name: JS PurchasePlugin productsUpdated akisini yamala
+        run: python3 scripts/patch-purchase-js.py
+
       - name: Capacitor native IAP bridge bundle uret
         run: node scripts/build-iap-bridge.mjs
 
@@ -190,7 +193,8 @@ jobs:
           grep -q 'p.raw.price' www/index.html
           test -f node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
           grep -q 'Product metadata loading must not wait' node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
-          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout ve native init patch dogrulandi."
+          grep -q 'productsUpdated early before receipts' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
+          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout, native init patch ve early productsUpdated patch dogrulandi."
 
       - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
         if: steps.signing-check.outputs.has_signing == 'true'
