@@ -9,7 +9,7 @@ ekler ve TUM Pod hedeflerinde kod imzalamayi kapatir.
 NEDEN GEREKLI?
 CI ortamindaki imzalama kimligi yalnizca ana uygulama hedefi icin
 gecerlidir. CocoaPods ile gelen bagimliliklar (AdMob, Firebase,
-cordova-plugin-purchase gibi) ayri hedefler olarak derlenir ve Xcode
+benzeri eklentiler gibi) ayri hedefler olarak derlenir ve Xcode
 bunlari da imzalamaya calisirsa arsivleme su hatayla coker:
 
     "No signing certificate iOS Development found"
