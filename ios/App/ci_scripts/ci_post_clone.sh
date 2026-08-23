@@ -1,6 +1,20 @@
 #!/bin/zsh
 set -euo pipefail
 
+# Xcode Cloud images provide Homebrew but may not expose Node/npm in PATH.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+if ! command -v npm >/dev/null 2>&1; then
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "[ci_post_clone] HATA: Homebrew bulunamadı; Node/npm kurulamadı." >&2
+    exit 127
+  fi
+  echo "[ci_post_clone] Node/npm bulunamadı; Homebrew ile Node kuruluyor."
+  brew install node
+  export PATH="$(brew --prefix)/bin:$PATH"
+fi
+command -v node
+command -v npm
+
 cd "${CI_PRIMARY_REPOSITORY_PATH:-$PWD}"
 echo "[ci_post_clone] Repository: ${CI_PRIMARY_REPOSITORY_PATH:-$PWD}"
 echo "[ci_post_clone] Commit: ${CI_COMMIT:-unknown}"
