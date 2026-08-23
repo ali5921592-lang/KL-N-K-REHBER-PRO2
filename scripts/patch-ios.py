@@ -9,9 +9,7 @@ GitHub Actions icinde asagidaki sekilde otomatik duzenler:
   2) ITSAppUsesNonExemptEncryption = false ekler.
   3) iPhone ve iPad icin uygun ekran yonu (orientation) destegini ayarlar.
   4) Gereksiz izin/aciklama anahtarlarini dogrular.
-  5) App ID hedefinde In-App Purchase capability kaydini ekler.
-  6) Native StoreKit 2 plugin'i iOS 15+ gerektirdigi icin uygulama
-     deployment target'ini 15.0'a ceker.
+  5) Uygulamanin minimum iOS deployment target'ini 15.0'a ceker.
 
 Bundle Identifier, versiyon ve build numarasi xcodebuild override'lariyla
 workflow tarafinda verilir. Bu script yalnizca CI/CD tarafindan native ios/
@@ -75,8 +73,8 @@ def patch_info_plist():
         "iPhone/iPad ekran yonleri, UIRequiresFullScreen kaldirildi.")
 
 
-def patch_xcode_capabilities_and_deployment_target():
-    """Generated Capacitor target'a IAP capability ve iOS 15 target ekler."""
+def patch_deployment_target():
+    """Generated Capacitor target'in minimum iOS surumunu 15.0 yapar."""
     if not os.path.exists(PBXPROJ_PATH):
         raise FileNotFoundError(
             f"{PBXPROJ_PATH} bulunamadi; Capacitor iOS projesi olusturulmamis olabilir."
@@ -84,30 +82,6 @@ def patch_xcode_capabilities_and_deployment_target():
 
     with open(PBXPROJ_PATH, "r", encoding="utf-8") as f:
         project = f.read()
-
-    # The generated Capacitor project has one app TargetAttributes block with
-    # ProvisioningStyle. Add the capability exactly once and keep the patch
-    # idempotent for local reruns or future workflow changes.
-    capability_marker = "com.apple.InAppPurchase = {"
-    if capability_marker not in project:
-        needle = "\t\t\t\t\t\tProvisioningStyle = Automatic;\n"
-        if needle not in project:
-            raise RuntimeError(
-                "Xcode TargetAttributes/ProvisioningStyle bulunamadi; "
-                "In-App Purchase capability guvenli bicimde eklenemedi."
-            )
-        capability_block = (
-            needle
-            + "\t\t\t\t\t\tSystemCapabilities = {\n"
-            + "\t\t\t\t\t\t\tcom.apple.InAppPurchase = {\n"
-            + "\t\t\t\t\t\t\t\tenabled = 1;\n"
-            + "\t\t\t\t\t\t\t};\n"
-            + "\t\t\t\t\t\t};\n"
-        )
-        project = project.replace(needle, capability_block, 1)
-        log("Xcode target'ina com.apple.InAppPurchase capability'si eklendi.")
-    else:
-        log("Xcode target'inda com.apple.InAppPurchase zaten mevcut.")
 
     old_target = "IPHONEOS_DEPLOYMENT_TARGET = 13.0;"
     new_target = f"IPHONEOS_DEPLOYMENT_TARGET = {MIN_IOS_VERSION};"
@@ -122,14 +96,12 @@ def patch_xcode_capabilities_and_deployment_target():
             "IPHONEOS_DEPLOYMENT_TARGET bulunamadi; minimum iOS surumu dogrulanamadi."
         )
 
-    if capability_marker not in project:
-        raise RuntimeError("In-App Purchase capability patch sonrasi dogrulanamadi.")
     if new_target not in project:
-        raise RuntimeError("iOS 15 deployment target patch sonrasi dogrulanamadi.")
+        raise RuntimeError("iOS deployment target patch sonrasi dogrulanamadi.")
 
     with open(PBXPROJ_PATH, "w", encoding="utf-8", newline="") as f:
         f.write(project)
-    log("Xcode project capability ve deployment target dogrulamasi tamamlandi.")
+    log("Xcode project deployment target dogrulamasi tamamlandi; IAP capability eklenmedi.")
 
 
 def verify_no_unnecessary_permissions():
@@ -148,7 +120,7 @@ def verify_no_unnecessary_permissions():
 def main():
     copy_privacy_manifest()
     patch_info_plist()
-    patch_xcode_capabilities_and_deployment_target()
+    patch_deployment_target()
     verify_no_unnecessary_permissions()
     log("iOS proje duzenlemeleri tamamlandi.")
 

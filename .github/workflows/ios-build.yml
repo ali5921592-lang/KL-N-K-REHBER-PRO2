@@ -39,7 +39,7 @@ permissions:
 jobs:
   build:
     name: Build iOS App
-    # Apple Silicon macOS-15 runner tahsis edilemedi; Intel hosted image ile denenecek.
+    # GitHub-hosted Intel macOS-15 runner.
     runs-on: macos-15-intel
 
     steps:
@@ -62,19 +62,6 @@ jobs:
       - name: NPM bagimliliklarini kur
         run: npm install
 
-      - name: Native PurchasePlugin init akisini yamala
-        run: python3 scripts/patch-purchase-plugin.py
-
-      - name: JS PurchasePlugin productsUpdated akisini yamala
-        run: python3 scripts/patch-purchase-js.py
-
-      - name: Capacitor native IAP bridge bundle uret
-        run: node scripts/build-iap-bridge.mjs
-
-      # DUZELTME: ios/ klasoru repoda commit edilmis oldugu icin
-      # "npx cap add ios" her calistiginda "platform already exists"
-      # hatasi verip is akisini durduruyordu. Artik sadece klasor
-      # yoksa ekleniyor, varsa dogrudan sync ile guncelleniyor.
       - name: Capacitor iOS platformunu ekle (yoksa) / var olani kullan
         run: |
           if [ ! -d "ios" ]; then
@@ -95,9 +82,6 @@ jobs:
 
       - name: CocoaPods bagimliliklarini da iceren senkronizasyon
         run: npx cap sync ios
-
-      - name: CocoaPods kopyasindaki PurchasePlugin init akisini dogrula ve yamala
-        run: python3 scripts/patch-purchase-plugin.py
 
       - name: AdMob Swift düzeltmesi
         run: python3 scripts/patch-admob-swift.py
@@ -177,31 +161,6 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
-      - name: IAP native ayarlarini ve web bridge'ini dogrula
-        run: |
-          set -eu
-          PBX="ios/App/App.xcodeproj/project.pbxproj"
-          test -f "$PBX"
-          grep -q 'com.apple.InAppPurchase = {' "$PBX"
-          grep -q 'enabled = 1;' "$PBX"
-          grep -q 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;' "$PBX"
-          test -f www/cdv-purchase.bundle.js
-          test -f www/purchase-bridge-bootstrap.js
-          grep -q 'com.klinikrehberpro.reklamsiz.aylik' www/index.html
-          grep -q 'CapacitorNativeBridge' www/cdv-purchase.bundle.js
-          grep -q 'registerPlugin' www/cdv-purchase.bundle.js
-          grep -q 'LOAD_TIMEOUT_MS = 8000' www/index.html
-          grep -q 'p.raw.price' www/index.html
-          test -f node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
-          grep -q 'Product metadata loading must not wait' node_modules/capacitor-plugin-cdv-purchase/ios/Sources/PurchasePlugin/PurchasePlugin.swift
-          grep -q 'productsUpdated early before receipts' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
-          grep -q 'nativeValidProducts' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
-          grep -q 'upstream callback returned an array without resolving' node_modules/capacitor-plugin-cdv-purchase/dist/index.js
-          grep -q 'diagnosticBuild' www/index.html
-          grep -q 'copyIapDiagnostics' www/index.html
-          grep -q 'nativeValidProducts' www/cdv-purchase.bundle.js
-          echo "IAP native capability, iOS 15 target, Capacitor bridge, timeout, native init patch, early productsUpdated patch, native load-error fix ve tanı paneli doğrulandı."
-
       - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
@@ -270,7 +229,7 @@ jobs:
           echo "- Bundle ID: \`${{ steps.params.outputs.bundle_id }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Versiyon: \`${{ steps.params.outputs.version }}\` (Build \`${{ steps.params.outputs.build_number }}\`)" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: IPA IAP ve metadata denetimi
+      - name: IPA metadata denetimi
         if: steps.signing-check.outputs.has_signing == 'true'
         run: |
           set -eu
@@ -283,15 +242,12 @@ jobs:
           MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist")
           test "$BUNDLE_ID" = "${{ steps.params.outputs.bundle_id }}"
           test "$MIN_OS" = "15.0"
-          test -f "$APP/public/cdv-purchase.bundle.js"
-          test -f "$APP/public/purchase-bridge-bootstrap.js"
-          grep -q 'com.klinikrehberpro.reklamsiz.aylik' "$APP/public/index.html"
-          grep -q 'LOAD_TIMEOUT_MS = 8000' "$APP/public/index.html"
-          grep -q 'p.raw.price' "$APP/public/index.html"
-          grep -q 'CapacitorNativeBridge' "$APP/public/cdv-purchase.bundle.js"
-          echo "IPA metadata dogrulandi: Bundle ID=$BUNDLE_ID MinimumOSVersion=$MIN_OS"
-          echo "IAP web bundle, product ID, timeout ve raw-price fallback IPA icinde mevcut."
-          echo "- IPA doğrulaması: Bundle ID \`$BUNDLE_ID\`, MinimumOSVersion \`$MIN_OS\`, IAP bridge/product ID mevcut" >> "$GITHUB_STEP_SUMMARY"
+          if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge' "$APP"; then
+            echo "::error::IPA içinde kaldırılması gereken abonelik/IAP referansı bulundu."
+            exit 1
+          fi
+          echo "IPA metadata dogrulandi: Bundle ID=$BUNDLE_ID MinimumOSVersion=$MIN_OS; abonelik/IAP referansı yok."
+          echo "- IPA doğrulaması: Bundle ID \`$BUNDLE_ID\`, MinimumOSVersion \`$MIN_OS\`, abonelik/IAP referansı yok" >> "$GITHUB_STEP_SUMMARY"
           rm -rf "$TMP_IPA_AUDIT"
 
       - name: IPA'yi is akisi ciktisi olarak yukle

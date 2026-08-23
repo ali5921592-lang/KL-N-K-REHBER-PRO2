@@ -352,37 +352,8 @@ ve Türkçe karakterlerle** yazılmalıdır (`srcNorm` normalizasyonu uygulanır
 > ⚠️ Kaynak bağlantıları periyodik olarak kontrol edilmeli, kırık bağlantılar
 > güncellenmeli ve `SOURCES_LAST_REVIEW` tarihi yenilenmelidir.
 
-## Uygulama İçi Satın Alma (App Store Yönerge 2.1(b))
-
-Uygulamada **gerçek bir uygulama içi satın alma** vardır: "Reklamsız Abonelik"
-(otomatik yenilenen aylık abonelik). Ücretsiz deneme yalnızca App Store Connect veya Play Console'da ilgili introductory offer/teklif tanımlıysa gösterilir.
-
-| Sembol / dosya | Görevi |
-|---|---|
-| `PREMIUM_IAP_ENABLED` | Satın alma arayüzünün ana anahtarı |
-| `window.IAP_CONFIG` | Ürün kimliği ve yasal bağlantılar |
-| `renderIapSection()` | Ayarlar ekranındaki satın alma kartı |
-| `window.iapSubscribe()` | Abonelik akışını başlatır |
-| `window.iapManageSubscription()` | Mağazanın abonelik yönetim ekranını açar |
-| `window.iapRestorePurchases()` | Satın alımları geri yükler (Apple 3.1.1 gereği zorunlu) |
-| `window.__iapState` | Arayüzün okuduğu durum (fiyat, dönem, deneme, uygunluk, hata) |
-| `cordova-plugin-purchase` | StoreKit + Google Play Billing 9 eklentisi |
-
-Aboneliğin çalışması için ürünün App Store Connect ve Play Console'da oluşturulması,
-ürün fiyatının tanımlanması ve ilgili uygulama sürümüyle incelemeye gönderilmesi gerekir.
-Ücretsiz deneme sunulacaksa introductory offer/teklif ayrıca mağaza panelinde oluşturulmalıdır.
-
-> **Ücretsiz deneme kodla yapılmaz**, mağaza panelinde "teklif" olarak tanımlanır.
-> Uygulama denemeyi mağazadan okur ve düğme metnini ("1 hafta ücretsiz dene" /
-> "Abone Ol") kullanıcının uygunluğuna göre otomatik ayarlar.
-
-> `IAP_CONFIG.legalUrls.privacy` ve `IAP_CONFIG.legalUrls.terms` canlı, tıklanabilir
-> gizlilik politikası ve Apple Standard EULA adresleridir. Bu adresler App Store metadata’sındaki
-> Privacy Policy ve Description bağlantılarıyla aynı tutulmalıdır.
-
-> ⏰ Google, 31 Ağustos 2026'dan itibaren Billing Library 8+ şartı koyuyor. Kullanılan
-> eklenti sürümü Billing 9 ile derlenir; eski sürüme düşürmeyin.
-
+## Uygulama İçi Satın Alma
+Bu sürümde uygulama içi satın alma, otomatik yenilenen abonelik veya premium üyelik sunulmaz. Tüm klinik içerik, ilaç rehberi, hesaplayıcılar, kaynaklar ve nöbet araçları ücretsiz olarak kullanılabilir. Reklam gösterimi yalnızca AdMob ve kullanıcının genel reklam tercihi üzerinden yönetilir.
 
 ## Harici Bağlantıların Açılması
 
