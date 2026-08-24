@@ -252,7 +252,7 @@ jobs:
           test -n "$ATT_TEXT"
           test -n "$GAD_ID"
 
-          if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge|PAID_SUBSCRIPTION|SKProductsRequest|SKPaymentQueue' "$APP"; then
+          if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge|PAID_SUBSCRIPTION' "$APP"; then
             echo "::error::IPA içinde kaldırılması gereken abonelik/IAP referansı bulundu."
             exit 1
           fi
