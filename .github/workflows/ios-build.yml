@@ -1,52 +1,40 @@
 name: iOS IPA Derle
 
-# Bu workflow bir macOS runner uzerinde calisir (Xcode gerektigi icin).
-# GitHub Actions'in macOS runner'lari Xcode'u onceden kurulu getirir;
-# sizin Mac veya Xcode kurmaniza gerek yoktur.
-#
-# ONEMLI: Apple, imzali (App Store'a yuklenebilir) bir .ipa uretebilmek
-# icin GERCEK bir Apple Developer Program uyeligi (yillik $99) ve o hesaptan
-# uretilmis bir Distribution sertifikasi + provisioning profile ister.
-# Bu bilgiler yalnizca SIZIN Apple Developer hesabinizdan alinabilir; bu
-# workflow bunlari sizin yerinize "uretemez". Asagidaki 5 secret
-# tanimlanmadigi surece bu workflow, projenin Xcode'da SORUNSUZ ACILDIGINI
-# VE DERLENDIGINI dogrulamak icin yalnizca bir SIMULATOR derlemesi (duman
-# testi) yapar. Secret'lar eklendiginde otomatik olarak gercek, imzali,
-# App Store'a yuklenebilir bir .ipa uretir.
+# App Store Connect'e gönderilecek sürümler yalnızca bilinçli bir manuel dispatch
+# ile üretilir. Push/release tetikleyicileri yanlış sürüm yüklenmesini önlemek için
+# özellikle kullanılmaz.
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       bundle_id:
-        description: 'Bundle Identifier (bos birakilirsa capacitor.config.json degeri kullanilir)'
-        required: false
-        default: ''
+        description: 'Bundle Identifier'
+        required: true
+        default: 'com.klinikrehberpro.app'
+        type: string
       marketing_version:
-        description: 'Versiyon numarasi (orn. 1.0.0)'
-        required: false
-        default: '1.0.0'
+        description: 'App Store sürümü'
+        required: true
+        default: '1.1.0'
+        type: string
       build_number:
-        description: 'Build numarasi (orn. 1)'
-        required: false
-        default: ''
-  release:
-    types: [ created ]
+        description: 'Build numarası'
+        required: true
+        default: '77'
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     name: Build iOS App
-    # GitHub-hosted Intel macOS-15 runner.
     runs-on: macos-15-intel
 
     steps:
       - name: Kodu al (checkout)
         uses: actions/checkout@v4
 
-      - name: Xcode surumunu sec
+      - name: Xcode sürümünü seç
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -56,90 +44,93 @@ jobs:
         with:
           node-version: '22'
 
-      - name: xcpretty kur (log ciktisi icin)
+      - name: xcpretty kur
         run: gem install xcpretty --no-document
 
-      - name: NPM bagimliliklarini kur
+      - name: NPM bağımlılıklarını kur
         run: npm install
 
-      - name: Capacitor iOS platformunu ekle (yoksa) / var olani kullan
+      - name: Capacitor iOS platformunu ekle / mevcut projeyi kullan
         run: |
+          set -euo pipefail
           if [ ! -d "ios" ]; then
-            echo "ios/ klasoru bulunamadi, olusturuluyor..."
             npx cap add ios
-          else
-            echo "ios/ klasoru repoda mevcut, dogrudan kullanilacak."
           fi
 
-      - name: Uygulama ikonu ve splash screen gorsellerini uret
+      - name: Uygulama ikonu ve splash görsellerini üret
         run: npx capacitor-assets generate --ios
 
-      - name: Reklam kimliklerini (AdMob) projeye isle
+      - name: Reklam kimliklerini (AdMob) projeye işle
         run: python3 scripts/patch-ads.py
 
-      - name: Podfile'i yamala (Pods hedeflerinde kod imzalamayi devre disi birak)
+      - name: Podfile'ı yamala
         run: python3 scripts/patch-podfile.py
 
-      - name: CocoaPods bagimliliklarini da iceren senkronizasyon
+      - name: CocoaPods bağımlılıklarıyla iOS senkronizasyonu
         run: npx cap sync ios
 
       - name: AdMob Swift düzeltmesi
         run: python3 scripts/patch-admob-swift.py
 
-      - name: iOS projesini duzenle (Privacy Manifest, Info.plist, ekran yonleri)
+      - name: iOS projesini düzenle
         run: python3 scripts/patch-ios.py
 
-      - name: Privacy Manifest'i Xcode projesine gercekten kaydet (Copy Bundle Resources)
+      - name: Privacy Manifest'i Xcode projesine ekle
         run: |
+          set -euo pipefail
           gem install xcodeproj --no-document
           ruby scripts/add_privacy_manifest_to_xcodeproj.rb
 
-      - name: Derleme parametrelerini belirle
+      - name: Derleme parametrelerini doğrula
         id: params
+        env:
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          VERSION: ${{ inputs.marketing_version }}
+          BUILD_NUM: ${{ inputs.build_number }}
         run: |
-          BUNDLE_ID="${{ github.event.inputs.bundle_id }}"
-          if [ -z "$BUNDLE_ID" ]; then
-            BUNDLE_ID=$(node -p "require('./capacitor.config.json').appId")
-          fi
-          VERSION="${{ github.event.inputs.marketing_version }}"
-          if [ -z "$VERSION" ]; then VERSION="1.0.0"; fi
-          BUILD_NUM="${{ github.event.inputs.build_number }}"
-          if [ -z "$BUILD_NUM" ]; then BUILD_NUM="${{ github.run_number }}"; fi
+          set -euo pipefail
+          test -n "$BUNDLE_ID"
+          test -n "$VERSION"
+          test -n "$BUILD_NUM"
           echo "bundle_id=$BUNDLE_ID" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUM" >> "$GITHUB_OUTPUT"
           echo "Bundle ID: $BUNDLE_ID / Version: $VERSION / Build: $BUILD_NUM"
 
-      - name: Imzalama sirlari mevcut mu kontrol et
+      - name: İmzalama sırları mevcut mu kontrol et
         id: signing-check
+        env:
+          CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.IOS_PROFILE_NAME }}
         run: |
-          if [ -n "${{ secrets.IOS_DIST_CERT_BASE64 }}" ] && [ -n "${{ secrets.IOS_DIST_CERT_PASSWORD }}" ] && [ -n "${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}" ] && [ -n "${{ secrets.IOS_TEAM_ID }}" ] && [ -n "${{ secrets.IOS_PROFILE_NAME }}" ]; then
+          set -euo pipefail
+          if [ -n "$CERT_BASE64" ] && [ -n "$CERT_PASSWORD" ] && [ -n "$PROFILE_BASE64" ] && [ -n "$TEAM_ID" ] && [ -n "$PROFILE_NAME" ]; then
             echo "has_signing=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_signing=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ============ SECRET'LAR YOKSA: SIMULATOR DUMAN TESTI ============
-      - name: "[Imzasiz mod] Simulator icin derle (proje saglik kontrolu)"
+      - name: "[İmzasız mod] Simulator duman testi"
         if: steps.signing-check.outputs.has_signing == 'false'
+        env:
+          VERSION: ${{ steps.params.outputs.version }}
+          BUILD_NUM: ${{ steps.params.outputs.build_number }}
         run: |
+          set -euo pipefail
           xcodebuild -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            MARKETING_VERSION="${{ steps.params.outputs.version }}" \
-            CURRENT_PROJECT_VERSION="${{ steps.params.outputs.build_number }}" \
-            build | xcpretty || true
-          echo "### ⚠️ İmzasız Mod (Duman Testi)" >> "$GITHUB_STEP_SUMMARY"
-          echo "Apple imzalama sirlari (secrets) tanimlanmadigi icin gercek bir .ipa uretilmedi." >> "$GITHUB_STEP_SUMMARY"
-          echo "Bunun yerine proje simulator icin basariyla derlendi mi diye kontrol edildi (yukaridaki log)." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**App Store'a yuklenebilir gercek bir .ipa icin gerekli 5 secret:**" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`IOS_DIST_CERT_BASE64\`, \`IOS_DIST_CERT_PASSWORD\`, \`IOS_PROVISION_PROFILE_BASE64\`, \`IOS_TEAM_ID\`, \`IOS_PROFILE_NAME\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "(Detayli adimlar icin README.md dosyasina bakin.)" >> "$GITHUB_STEP_SUMMARY"
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUM" \
+            build | xcpretty
+          echo "### İmzasız mod: yalnızca simulator duman testi yapıldı" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
-      # ============ SECRET'LAR VARSA: GERÇEK İMZALI .IPA ============
       - name: "[İmzalı mod] Sertifika ve provisioning profile kur"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
@@ -147,25 +138,36 @@ jobs:
           CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
         run: |
+          set -euo pipefail
           KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
 
-          echo "$CERT_BASE64" | base64 -d > certificate.p12
+          printf '%s' "$CERT_BASE64" | base64 --decode > certificate.p12
           security import certificate.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           rm -f certificate.p12
 
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROFILE_BASE64" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          PROFILE_FILE="$PROFILE_DIR/profile.mobileprovision"
+          printf '%s' "$PROFILE_BASE64" | base64 --decode > "$PROFILE_FILE"
+          security cms -D -i "$PROFILE_FILE" > /tmp/installed_profile.plist
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /tmp/installed_profile.plist)
+          PROFILE_EMBEDDED_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' /tmp/installed_profile.plist)
+          mv "$PROFILE_FILE" "$PROFILE_DIR/${PROFILE_UUID}.mobileprovision"
+          echo "Provisioning profile installed: UUID=$PROFILE_UUID / Name=$PROFILE_EMBEDDED_NAME"
 
-      - name: "[İmzalı mod] Arşivle (xcodebuild archive)"
+      - name: "[İmzalı mod] Archive oluştur"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           PROFILE_NAME: ${{ secrets.IOS_PROFILE_NAME }}
+          BUNDLE_ID: ${{ steps.params.outputs.bundle_id }}
+          VERSION: ${{ steps.params.outputs.version }}
+          BUILD_NUM: ${{ steps.params.outputs.build_number }}
         run: |
           set -o pipefail
           if xcodebuild -workspace ios/App/App.xcworkspace \
@@ -173,9 +175,9 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -archivePath build/App.xcarchive \
-            PRODUCT_BUNDLE_IDENTIFIER="${{ steps.params.outputs.bundle_id }}" \
-            MARKETING_VERSION="${{ steps.params.outputs.version }}" \
-            CURRENT_PROJECT_VERSION="${{ steps.params.outputs.build_number }}" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUM" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
@@ -186,17 +188,14 @@ jobs:
             ARCHIVE_OK=0
           fi
           if [ "$ARCHIVE_OK" -ne 1 ] || [ ! -d "build/App.xcarchive" ]; then
-            echo "::error::Arsiv olusturulamadi."
-            echo "============ 'error' GECEN SATIRLAR (ONCELIKLI OKU) ============"
-            grep -i "error" /tmp/archive.log || echo "(error kelimesi gecen satir bulunamadi, tam logu asagida oku)"
-            echo "============ TAM XCODEBUILD LOG CIKTISI ============"
+            echo "::error::Archive oluşturulamadı."
+            grep -i "error" /tmp/archive.log || true
             cat /tmp/archive.log
-            echo "============================================================"
             exit 1
           fi
-          echo "Arsivleme tamamlandi."
+          echo "Archive tamamlandı."
 
-      - name: "[İmzalı mod] exportOptions.plist olustur"
+      - name: "[İmzalı mod] exportOptions.plist oluştur"
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
@@ -204,7 +203,7 @@ jobs:
           BUNDLE_ID: ${{ steps.params.outputs.bundle_id }}
         run: python3 scripts/generate-export-options.py
 
-      - name: "[İmzalı mod] .ipa olarak dısa aktar (xcodebuild -exportArchive)"
+      - name: "[İmzalı mod] IPA dışa aktar"
         if: steps.signing-check.outputs.has_signing == 'true'
         run: |
           set -o pipefail
@@ -217,69 +216,122 @@ jobs:
             EXPORT_OK=0
           fi
           if [ "$EXPORT_OK" -ne 1 ] || ! ls build/ipa/*.ipa >/dev/null 2>&1; then
-            echo "::error::IPA olusturulamadi."
-            echo "============ 'error' GECEN SATIRLAR (ONCELIKLI OKU) ============"
-            grep -i "error" /tmp/export.log || echo "(error kelimesi gecen satir bulunamadi, tam logu asagida oku)"
-            echo "============ TAM XCODEBUILD LOG CIKTISI ============"
+            echo "::error::IPA oluşturulamadı."
+            grep -i "error" /tmp/export.log || true
             cat /tmp/export.log
-            echo "============================================================"
             exit 1
           fi
-          echo "### ✅ App Store'a Hazir IPA Uretildi" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Bundle ID: \`${{ steps.params.outputs.bundle_id }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Versiyon: \`${{ steps.params.outputs.version }}\` (Build \`${{ steps.params.outputs.build_number }}\`)" >> "$GITHUB_STEP_SUMMARY"
+          echo "IPA dışa aktarma tamamlandı."
 
-      - name: IPA metadata denetimi
+      - name: IPA metadata ve abonelik/ATT denetimi
         if: steps.signing-check.outputs.has_signing == 'true'
+        env:
+          EXPECTED_BUNDLE_ID: ${{ steps.params.outputs.bundle_id }}
+          EXPECTED_VERSION: ${{ steps.params.outputs.version }}
+          EXPECTED_BUILD: ${{ steps.params.outputs.build_number }}
         run: |
-          set -eu
+          set -euo pipefail
           IPA=$(ls build/ipa/*.ipa | head -1)
           TMP_IPA_AUDIT=$(mktemp -d)
+          trap 'rm -rf "$TMP_IPA_AUDIT"' EXIT
           unzip -q "$IPA" -d "$TMP_IPA_AUDIT"
           APP=$(find "$TMP_IPA_AUDIT/Payload" -maxdepth 1 -name '*.app' -type d | head -1)
           test -n "$APP"
+
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
           MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist")
-          test "$BUNDLE_ID" = "${{ steps.params.outputs.bundle_id }}"
+          ATT_TEXT=$(/usr/libexec/PlistBuddy -c 'Print :NSUserTrackingUsageDescription' "$APP/Info.plist")
+          GAD_ID=$(/usr/libexec/PlistBuddy -c 'Print :GADApplicationIdentifier' "$APP/Info.plist")
+
+          test "$BUNDLE_ID" = "$EXPECTED_BUNDLE_ID"
+          test "$VERSION" = "$EXPECTED_VERSION"
+          test "$BUILD" = "$EXPECTED_BUILD"
           test "$MIN_OS" = "15.0"
-          if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge' "$APP"; then
+          test -n "$ATT_TEXT"
+          test -n "$GAD_ID"
+
+          if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge|StoreKit|PAID_SUBSCRIPTION' "$APP"; then
             echo "::error::IPA içinde kaldırılması gereken abonelik/IAP referansı bulundu."
             exit 1
           fi
-          echo "IPA metadata dogrulandi: Bundle ID=$BUNDLE_ID MinimumOSVersion=$MIN_OS; abonelik/IAP referansı yok."
-          echo "- IPA doğrulaması: Bundle ID \`$BUNDLE_ID\`, MinimumOSVersion \`$MIN_OS\`, abonelik/IAP referansı yok" >> "$GITHUB_STEP_SUMMARY"
-          rm -rf "$TMP_IPA_AUDIT"
 
-      - name: IPA'yi is akisi ciktisi olarak yukle
+          echo "IPA denetimi geçti: $BUNDLE_ID / $VERSION ($BUILD), MinimumOSVersion=$MIN_OS, ATT purpose string mevcut, AdMob mevcut, abonelik/IAP referansı yok."
+          {
+            echo "### IPA denetimi"
+            echo "- Bundle ID: $BUNDLE_ID"
+            echo "- Version / Build: $VERSION ($BUILD)"
+            echo "- Minimum iOS: $MIN_OS"
+            echo "- ATT purpose string: mevcut"
+            echo "- AdMob: mevcut"
+            echo "- Abonelik/IAP izleri: yok"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: IPA'yı GitHub artifact olarak yükle
         if: steps.signing-check.outputs.has_signing == 'true'
-        # GitHub artifact kotası dolu olsa bile IPA'nın App Store Connect'e
-        # yüklenmesi engellenmemeli; ASC upload adımı bir sonraki adımdır.
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: klinik-rehber-pro-ipa
+          name: klinik-rehber-pro-ipa-build-${{ steps.params.outputs.build_number }}
           path: build/ipa/*.ipa
           if-no-files-found: error
           retention-days: 90
 
-      - name: Dosyalari GitHub Release'e ekle (yalnizca release olayinda)
-        if: steps.signing-check.outputs.has_signing == 'true' && github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/ipa/*.ipa
-
-      - name: App Store Connect'e yukle
+      - name: App Store Connect Transporter'ı kur ve IPA'yı yükle
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
         run: |
-          set -e
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$ASC_API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          set -euo pipefail
+          test -n "$ASC_KEY_ID"
+          test -n "$ASC_ISSUER_ID"
+          test -n "$ASC_API_KEY_BASE64"
+
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_FILE="$KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          openssl pkey -in "$KEY_FILE" -noout >/dev/null
+
+          TRANSPORTER_INDEX='https://itunesconnect.apple.com/WebObjects/iTunesConnect.woa/ra/resources/download/public/Transporter__OSX/bin/'
+          TRANSPORTER_DIR="$RUNNER_TEMP/transporter"
+          mkdir -p "$TRANSPORTER_DIR"
+          curl --fail --location --silent --show-error "$TRANSPORTER_INDEX" -o "$TRANSPORTER_DIR/index.html"
+          PKG_NAME=$(grep -oE 'iTMSTransporter[_-][0-9][A-Za-z0-9._-]*\.pkg' "$TRANSPORTER_DIR/index.html" | sort -V | tail -1)
+          if [ -z "$PKG_NAME" ]; then
+            echo "::error::Apple Transporter paket adı resmi dizinde bulunamadı."
+            exit 1
+          fi
+          curl --fail --location --silent --show-error \
+            "${TRANSPORTER_INDEX}${PKG_NAME}" \
+            -o "$TRANSPORTER_DIR/transporter.pkg"
+          sudo installer -pkg "$TRANSPORTER_DIR/transporter.pkg" -target /
+
+          TRANSPORTER=""
+          for CANDIDATE in \
+            "$(xcrun --find iTMSTransporter 2>/dev/null || true)" \
+            "/usr/local/itms/bin/iTMSTransporter" \
+            "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter"; do
+            if [ -x "$CANDIDATE" ]; then
+              TRANSPORTER="$CANDIDATE"
+              break
+            fi
+          done
+          if [ -z "$TRANSPORTER" ]; then
+            TRANSPORTER=$(find /Applications /usr/local -type f -name iTMSTransporter -perm -111 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$TRANSPORTER" ]; then
+            echo "::error::iTMSTransporter executable bulunamadı."
+            exit 1
+          fi
+
           IPA=$(ls build/ipa/*.ipa | head -1)
-          echo "Yukleniyor: $IPA"
-          xcrun altool --upload-app -f "$IPA" -t ios \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
-          echo "### Yukleme tamamlandi" >> "$GITHUB_STEP_SUMMARY"
+          "$TRANSPORTER" -m upload \
+            -assetFile "$IPA" \
+            -apiKey "$ASC_KEY_ID" \
+            -apiIssuer "$ASC_ISSUER_ID" \
+            -v eXtreme
+          echo "### App Store Connect Transporter yüklemesi tamamlandı" >> "$GITHUB_STEP_SUMMARY"

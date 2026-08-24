@@ -26,6 +26,10 @@ PBXPROJ_PATH = os.path.join("ios", "App", "App.xcodeproj", "project.pbxproj")
 PRIVACY_MANIFEST_SRC = os.path.join("ios-privacy", "PrivacyInfo.xcprivacy")
 PRIVACY_MANIFEST_DST = os.path.join(IOS_APP_DIR, "PrivacyInfo.xcprivacy")
 MIN_IOS_VERSION = "15.0"
+ATT_USAGE_DESCRIPTION = (
+    "Cihaz kimliğiniz, izninizle kişiselleştirilmiş reklamlar sunmak "
+    "ve reklam performansını ölçmek için kullanılabilir."
+)
 
 
 def log(msg):
@@ -55,6 +59,9 @@ def patch_info_plist():
         plist = plistlib.load(f)
 
     plist["ITSAppUsesNonExemptEncryption"] = False
+    # AdMob config requests ATT/IDFA access; keep Apple's required purpose text
+    # in the generated native plist so it survives `npx cap sync ios`.
+    plist["NSUserTrackingUsageDescription"] = ATT_USAGE_DESCRIPTION
     plist["UISupportedInterfaceOrientations"] = [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationPortraitUpsideDown",
@@ -69,8 +76,9 @@ def patch_info_plist():
 
     with open(INFO_PLIST_PATH, "wb") as f:
         plistlib.dump(plist, f)
-    log("Info.plist guncellendi: ITSAppUsesNonExemptEncryption=false, "
-        "iPhone/iPad ekran yonleri, UIRequiresFullScreen kaldirildi.")
+    log("Info.plist guncellendi: ATT purpose string, "
+        "ITSAppUsesNonExemptEncryption=false, iPhone/iPad ekran yonleri, "
+        "UIRequiresFullScreen kaldirildi.")
 
 
 def patch_deployment_target():

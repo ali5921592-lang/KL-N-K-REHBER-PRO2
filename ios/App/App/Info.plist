@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-7996356702191225~2940143624</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Cihaz kimliğiniz, izninizle kişiselleştirilmiş reklamlar sunmak ve reklam performansını ölçmek için kullanılabilir.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
