@@ -314,19 +314,22 @@ jobs:
           for CANDIDATE in \
             "$(xcrun --find iTMSTransporter 2>/dev/null || true)" \
             "/usr/local/itms/bin/iTMSTransporter" \
-            "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter"; do
-            if [ -x "$CANDIDATE" ]; then
+            "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter" \
+            "/Applications/Transporter.app/Contents/itms/bin/iTMSTransporter.sh"; do
+            if [ -f "$CANDIDATE" ]; then
               TRANSPORTER="$CANDIDATE"
               break
             fi
           done
           if [ -z "$TRANSPORTER" ]; then
-            TRANSPORTER=$(find /Applications /usr/local -type f -name iTMSTransporter -perm -111 2>/dev/null | head -1 || true)
+            TRANSPORTER=$(find /Applications /usr/local /Library "$HOME" -type f \
+              \( -name iTMSTransporter -o -name iTMSTransporter.sh \) 2>/dev/null | head -1 || true)
           fi
           if [ -z "$TRANSPORTER" ]; then
             echo "::error::iTMSTransporter executable bulunamadı."
             exit 1
           fi
+          chmod +x "$TRANSPORTER" || true
 
           IPA=$(ls build/ipa/*.ipa | head -1)
           "$TRANSPORTER" -m upload \
