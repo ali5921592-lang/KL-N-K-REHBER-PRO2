@@ -299,15 +299,12 @@ jobs:
           TRANSPORTER_INDEX='https://itunesconnect.apple.com/WebObjects/iTunesConnect.woa/ra/resources/download/public/Transporter__OSX/bin/'
           TRANSPORTER_DIR="$RUNNER_TEMP/transporter"
           mkdir -p "$TRANSPORTER_DIR"
-          curl --fail --location --silent --show-error "$TRANSPORTER_INDEX" -o "$TRANSPORTER_DIR/index.html"
-          PKG_NAME=$(grep -oE 'iTMSTransporter[_-][0-9][A-Za-z0-9._-]*\.pkg' "$TRANSPORTER_DIR/index.html" | sort -V | tail -1)
-          if [ -z "$PKG_NAME" ]; then
-            echo "::error::Apple Transporter paket adı resmi dizinde bulunamadı."
-            exit 1
-          fi
+          # Apple’ın macOS endpoint’i liste döndürmez; güncel .pkg dosyasını
+          # doğrudan response body olarak verir (XAR magic: xar!).
           curl --fail --location --silent --show-error \
-            "${TRANSPORTER_INDEX}${PKG_NAME}" \
+            "$TRANSPORTER_INDEX" \
             -o "$TRANSPORTER_DIR/transporter.pkg"
+          test "$(head -c 4 "$TRANSPORTER_DIR/transporter.pkg")" = "xar!"
           sudo installer -pkg "$TRANSPORTER_DIR/transporter.pkg" -target /
 
           TRANSPORTER=""
@@ -322,8 +319,14 @@ jobs:
             fi
           done
           if [ -z "$TRANSPORTER" ]; then
-            TRANSPORTER=$(find /Applications /usr/local /Library "$HOME" -type f \
-              \( -name iTMSTransporter -o -name iTMSTransporter.sh \) 2>/dev/null | head -1 || true)
+            TRANSPORTER=$(find /Applications /usr/local /opt/homebrew /opt/local /Library "$HOME" -type f \
+              \( -iname iTMSTransporter -o -iname iTMSTransporter.sh \) 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$TRANSPORTER" ]; then
+            # Apple paketinin kurulum yolu sürümler arasında değişebildiği için
+            # son çare olarak tüm runner dosya sisteminde launcher aranır.
+            TRANSPORTER=$(find / -type f \
+              \( -iname iTMSTransporter -o -iname iTMSTransporter.sh \) 2>/dev/null | head -1 || true)
           fi
           if [ -z "$TRANSPORTER" ]; then
             echo "::error::iTMSTransporter executable bulunamadı."
