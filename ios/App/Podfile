@@ -11,7 +11,6 @@ install! 'cocoapods', :disable_input_output_paths => true
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
-  pod 'CapacitorCommunityAdmob', :path => '../../node_modules/@capacitor-community/admob'
   pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
   pod 'CapacitorBrowser', :path => '../../node_modules/@capacitor/browser'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/@capacitor/local-notifications'
@@ -20,10 +19,6 @@ def capacitor_pods
 end
 
 target 'App' do
-
-  # --- CI: Bagimlilik surum sabitleme ---
-  pod 'GoogleUserMessagingPlatform', '~> 3.1.0'
-
   capacitor_pods
   # Add your Pods here
 end
