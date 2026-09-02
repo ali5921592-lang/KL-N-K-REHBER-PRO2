@@ -36,11 +36,6 @@
     "LocalNotifications": {
       "smallIcon": "ic_stat_notify",
       "iconColor": "#1657CF"
-    },
-    "AdMob": {
-      "requestTrackingAuthorization": true,
-      "testingDevices": [],
-      "initializeForTesting": true
     }
   }
 }
