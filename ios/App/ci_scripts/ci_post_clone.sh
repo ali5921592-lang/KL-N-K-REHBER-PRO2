@@ -25,9 +25,7 @@ npx capacitor-assets generate --ios
 npx cap sync ios
 
 # Apply the same production patches used by the signed GitHub build.
-python3 scripts/patch-ads.py
 python3 scripts/patch-podfile.py
-python3 scripts/patch-admob-swift.py
 python3 scripts/patch-ios.py
 
 gem install xcodeproj --no-document

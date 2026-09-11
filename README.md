@@ -1,6 +1,6 @@
-# Klinik Rehber Pro — Android + iOS Uygulaması
+# Klinik Rehber — Android + iOS Uygulaması
 
-Bu klasör, mevcut **Klinik Rehber Pro** web uygulamasını (`www/index.html`),
+Bu klasör, mevcut **Klinik Rehber** web uygulamasını (`www/index.html`),
 hiçbir iç kodu değiştirmeden, [Capacitor](https://capacitorjs.com/) ile hem
 **Android** hem **iOS** uygulamasına dönüştürür. APK, AAB ve IPA dosyaları
 **GitHub Actions** üzerinden otomatik olarak derlenir — Android Studio veya
@@ -8,101 +8,22 @@ Xcode kurmanıza ya da elle bir işlem yapmanıza gerek yoktur (iOS derlemesi
 GitHub'ın bulut üzerindeki macOS runner'ında, Xcode önceden kurulu şekilde
 çalışır).
 
-## 📢 AdMob Reklamları
+## 🚫 Reklam ve Abonelik Yok
 
-Uygulamaya Google AdMob (banner + geçiş + ödüllü reklam) altyapısı entegre
-edilmiştir. (Firebase Analytics kaldırıldı — aşağıya bakınız.) **Varsayılan olarak Google'ın resmi TEST reklam
-kimlikleri** kullanılır — bunlar gerçek para kazandırmaz ama güvenle test
-edilebilir, App Store/Play Store politikalarını ihlal etmez.
+Bu sürümde **hiçbir reklam (banner, geçiş ve ödüllü dâhil) ve hiçbir uygulama
+içi satın alma / abonelik bulunmaz.** Uygulamada Google AdMob, Firebase
+Analytics veya benzeri bir reklam/izleme SDK'sı yoktur. Bu davranış mağaza
+beyanlarıyla (ör. Google Play "Veri güvenliği" ve "Reklam içerir mi" alanları)
+birebir uyumludur.
 
-### Gerçek reklam kimliklerinizi tek dosyadan değiştirme
+Tüm klinik içerik, ilaç rehberi, hesaplayıcılar, kaynaklar ve nöbet araçları
+ücretsizdir; uygulama tamamen çevrimdışı çalışır ve kullanıcıdan veri toplamaz.
 
-Proje kökündeki **`ad-config.json`** dosyası tüm reklam kimliklerinin TEK
-kaynağıdır:
-
-```json
-{
-  "android": {
-    "appId": "ca-app-pub-XXXXXXXX~XXXXXXXX",
-    "bannerId": "ca-app-pub-XXXXXXXX/XXXXXXXX",
-    "interstitialId": "ca-app-pub-XXXXXXXX/XXXXXXXX",
-    "rewardedId": "ca-app-pub-XXXXXXXX/XXXXXXXX"
-  },
-  "ios": { "...aynı yapı..." }
-}
-```
-
-Kendi [AdMob hesabınızdan](https://apps.admob.com) aldığınız gerçek kimliklerle
-bu dosyayı güncelleyip commit ettiğinizde, `scripts/patch-ads.py` bir sonraki
-derlemede bu değerleri otomatik olarak:
-- Android Manifest'e (`APPLICATION_ID` meta-data),
-- iOS Info.plist'e (`GADApplicationIdentifier` + `SKAdNetworkItems`),
-- Web uygulamasının reklam modülüne (banner/geçiş/ödüllü ID'leri),
-
-işler. Başka hiçbir dosyayı elle düzenlemeniz gerekmez.
-
-### GDPR/UMP Rıza Yönetimi (AB/İngiltere/İsviçre kullanıcıları için zorunlu)
-
-Google, AB/İngiltere/İsviçre'deki kullanıcılara reklam gösterilmeden önce rıza (consent) formu gösterilmesini **zorunlu** kılar; aksi halde AdMob hesabınız politika ihlali nedeniyle askıya alınabilir. Kod tarafı tamamen hazır:
-- Uygulama açılışında, kullanıcının konumuna göre rıza gerekip gerekmediği otomatik kontrol edilir ve gerekiyorsa Google'ın standart rıza formu gösterilir — reklam SDK'sı ancak bu adımdan SONRA başlatılır.
-- Kullanıcılar Ayarlar ekranındaki **"Gizlilik Tercihlerini Yönet"** butonuyla rızalarını istedikleri zaman değiştirebilir (Google bunu da zorunlu tutar).
-
-**Sizin yapmanız gereken tek şey:** [AdMob hesabınızda](https://apps.admob.com) **Gizlilik ve mesajlaşma (Privacy & messaging)** bölümünden bir "GDPR mesajı" (rıza formu şablonu) oluşturup yayınlamak. Bu, kod değişikliği gerektirmez — Google konsolunda birkaç dakikalık bir kurulumdur. Bu adım tamamlanmadan uygulama çökmez, sadece form gösterilmez ve reklamlar doğrudan başlatılır.
-
-### Firebase Analytics — ŞU AN KURULU DEĞİL
-
-`@capacitor-firebase/analytics` bağımlılığı **kaldırıldı.** Sebebi:
-
-- Ne `GoogleService-Info.plist` (iOS) ne `google-services.json` (Android)
-  projede mevcuttu; bunlar olmadan Firebase zaten hiçbir veri toplayamıyordu.
-- Buna rağmen iOS derlemesini şu hatayla kırıyordu:
-  `no such module 'FirebaseCore'` → **ARCHIVE FAILED**.
-
-Uygulama kodu Firebase'i zaten isteğe bağlı olarak kullanıyor
-(`Plugins.FirebaseAnalytics || null`), bu yüzden kaldırılması hiçbir
-özelliği bozmaz — analytics çağrıları sessizce atlanır.
-
-#### İleride gerçekten Firebase Analytics isterseniz
-
-Sırasıyla şunlar gerekir (üçü de yapılmadan çalışmaz):
-
-1. [Firebase Console](https://console.firebase.google.com)'da proje oluşturun.
-   Android ve iOS uygulamalarını ekleyin — paket adı `capacitor.config.json`
-   içindeki `appId` ile **birebir aynı** olmalı (`com.klinikrehberpro.app`).
-2. İndirdiğiniz dosyaları repoya koyun:
-   - `resources/google-services.json`
-   - `resources/GoogleService-Info.plist`
-3. Yapılandırma dosyalarını CI'da native projelere kopyalayın:
-   - Android: `build-android.yml` içinde bu adım **zaten var**.
-   - iOS: `ios-build.yml`'ye `npx cap sync ios` ADIMINDAN ÖNCE ekleyin:
-     ```yaml
-     - name: Firebase GoogleService-Info.plist kopyala
-       run: |
-         if [ -f "resources/GoogleService-Info.plist" ]; then
-           cp resources/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
-         fi
-     ```
-     Ayrıca dosyanın Xcode projesinin "Copy Bundle Resources" fazına
-     eklenmesi gerekir — yalnızca kopyalamak yetmez.
-4. `package.json` içine `"@capacitor-firebase/analytics": "^6.3.0"` satırını geri ekleyin.
-
-> iOS'ta `GoogleService-Info.plist` uygulama paketine gerçekten girmezse,
-> Firebase çalışma zamanında başlatılamaz. Bu yüzden 3. adımdaki
-> "Copy Bundle Resources" kısmı atlanmamalıdır.
-
-### Reklam davranış kuralları (kod içinde uygulanmıştır)
-
-- **Banner**: Ana sayfa dahil tüm sayfalarda ekranın en altında sabit, responsive, içeriği kapatmaz.
-- **Geçiş reklamı**: Uygulama açılır açılmaz gösterilmez (20 saniye bekleme), en az 4-5 farklı bölüm gezildikten sonra, en az 3 dakika arayla, art arda gösterilmez. **CPR/acil müdahale (112/Ambulans ve Acil Servis klinikleri), ilaç dozu detay sayfaları ve hesaplama araçlarında (Hesaplama, Kan Gazı) ASLA gösterilmez.**
-- **Ödüllü reklam**: `window.showRewardedAd(onReward, onUnavailable)` fonksiyonu üzerinden ileride "Premium içerik aç", "PDF indir" gibi özellikler için hazır; şu an hiçbir içerik buna bağlı değil.
-- **Premium**: Ayarlar ekranından etkinleştirildiğinde tüm reklamlar (banner+geçiş+ödüllü) tamamen kapanır. Şu an bu bir geliştirici/test butonu; gerçek uygulama içi satın alma (App Store/Play Store IAP) entegrasyonu ayrı bir iş olarak eklenmelidir.
-- **Performans**: Reklamlar önceden yüklenir (`prepareInterstitial`/`prepareRewardVideoAd`), sayfa geçişlerini bloklamaz, internet yoksa banner alanı otomatik gizlenir, reklam yüklenemezse uygulama hata vermez (tüm çağrılar try/catch içinde).
-
-### Ayarlar ekranından yönetim
-
-Uygulama içinde sağ üstteki ⚙️ ikonuna dokunarak: Premium aç/kapat (test),
-reklamları geliştirici modunda tamamen kapatma, test/gerçek reklam modu
-arasında geçiş ve güncel reklam durumunu görüntüleme mümkündür.
+Ayrıca uygulamanın çalışması sırasında — kullanıcı bir kaynak bağlantısına
+**bilerek dokunmadıkça** — **hiçbir sunucuya otomatik istek yapılmaz**: harici
+font/CDN, analitik, reklam veya izleme çağrısı yoktur. Bu, Apple App Store
+Yönerge 5.6 kapsamındaki "gizli özellik / beyan edilmemiş veri toplama"
+endişelerini ortadan kaldırmak içindir.
 
 ## Nasıl çalışır? (Android)
 
@@ -123,8 +44,8 @@ arasında geçiş ve güncel reklam durumunu görüntüleme mümkündür.
      **AAB** (Play Store formatı) üretir,
    - İkisini de iş akışının "Artifacts" (çıktılar) bölümüne yükler.
 3. Derlenen dosyaları indirmek için: **Actions** sekmesi → ilgili çalıştırma →
-   sayfanın altındaki **Artifacts** bölümü → `hemsire-rehberi-pro-apk` /
-   `hemsire-rehberi-pro-aab` dosyalarını indirin.
+   sayfanın altındaki **Artifacts** bölümü → `klinik-rehber-apk` /
+   `klinik-rehber-aab` dosyalarını indirin.
 
 ## ⚠️ Play Store'a yüklemeden önce: gerçek imzalama şart
 
@@ -137,7 +58,7 @@ Play Store'a yüklenebilir, gerçek imzalı bir AAB almak için:
 ### 1) Bir imzalama anahtarı (keystore) oluşturun (bilgisayarınızda, bir kez)
 
 ```bash
-keytool -genkey -v -keystore release.keystore -alias hemsire-rehberi \
+keytool -genkey -v -keystore release.keystore -alias klinik-rehber \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
@@ -162,7 +83,7 @@ Repo sayfanızda: **Settings → Secrets and variables → Actions → New repos
 |---|---|
 | `KEYSTORE_BASE64` | `release.keystore.base64.txt` dosyasının içeriği |
 | `KEYSTORE_PASSWORD` | `keytool` sırasında girdiğiniz keystore şifresi |
-| `KEY_ALIAS` | `hemsire-rehberi` (yukarıdaki `-alias` değeri) |
+| `KEY_ALIAS` | `klinik-rehber` (yukarıdaki `-alias` değeri) |
 | `KEY_PASSWORD` | Anahtar (key) şifresi (genelde keystore şifresiyle aynıdır) |
 
 Bu 4 secret eklendikten sonra yapılan her push'ta iş akışı **otomatik olarak
@@ -199,7 +120,7 @@ olarak gerçek, imzalı, App Store'a yüklenebilir bir `.ipa` üretir.
 
 1. **Apple Developer hesabınızla** [developer.apple.com](https://developer.apple.com) → Certificates, Identifiers & Profiles bölümüne gidin.
 2. **Distribution sertifikası** oluşturun (Certificates → + → Apple Distribution), indirin, Mac'inizde çift tıklayıp Keychain Access'e ekleyin, sonra Keychain Access'ten sağ tık > Export > `.p12` formatında dışa aktarın (bir şifre belirleyin).
-3. **App ID** oluşturun (Identifiers → + → App IDs), `capacitor.config.json` içindeki `appId` (`com.hemsirerehberi.pro`) ile birebir aynı olmalı.
+3. **App ID** oluşturun (Identifiers → + → App IDs), `capacitor.config.json` içindeki `appId` (`com.klinikrehberpro.app`) ile birebir aynı olmalı.
 4. **Provisioning Profile** oluşturun (Profiles → + → App Store → yukarıdaki App ID'yi ve sertifikayı seçin), indirin (`.mobileprovision` dosyası), bir isim verin (bu isim `IOS_PROFILE_NAME` olacak).
 5. **Team ID**'nizi bulun: developer.apple.com → Membership sayfasında görünür (10 karakterlik kod).
 6. `.p12` ve `.mobileprovision` dosyalarını base64'e çevirin:
@@ -262,8 +183,11 @@ ayrı bir `<script>` bloğu eklendi. Bu script:
 
 ## İzinler
 
-Uygulama tamamen çevrimdışı çalıştığı için `INTERNET` ve
-`ACCESS_NETWORK_STATE` izinleri CI tarafından otomatik kaldırılır. Yalnızca
+Uygulama çevrimdışı çalışır ve kullanıcıdan hiçbir veri toplamaz. Reklam,
+analitik veya izleme SDK'sı içermediği için yalnızca WebView'ın temel
+çalışması ve harici kaynak bağlantıları için gereken `INTERNET` /
+`ACCESS_NETWORK_STATE` izinleri kalır; kamera, konum, mikrofon, kişiler gibi
+gereksiz izinler CI tarafından otomatik kaldırılır. Yalnızca
 nöbet bildirimi özelliği için gerekli olan bildirim izni (Android 13+'ta
 çalışma zamanında kullanıcıya sorulur) kalır. Bu özelliği hiç istemiyorsanız
 `package.json` içinden `@capacitor/local-notifications` satırını silip
@@ -290,9 +214,8 @@ cd android
 ```
 ├── .github/workflows/build-android.yml   # Android otomatik derleme iş akışı
 ├── .github/workflows/build-ios.yml       # iOS otomatik derleme iş akışı
-├── ad-config.json                        # AdMob reklam kimlikleri (TEK dosyadan yönetim)
 ├── capacitor.config.json                 # Capacitor yapılandırması (Android+iOS)
-├── package.json                          # Bağımlılıklar (Android+iOS+AdMob+Abonelik)
+├── package.json                          # Bağımlılıklar (Android + iOS)
 ├── resources/
 │   ├── icon.png                          # Uygulama ikonu kaynağı (1024x1024)
 │   ├── splash.png                        # Açılış ekranı kaynağı (2732x2732)
@@ -301,10 +224,10 @@ cd android
 ├── scripts/
 │   ├── patch-android.py                  # CI'da native Android projesini düzenleyen script
 │   ├── patch-ios.py                      # CI'da native iOS projesini düzenleyen script (Info.plist, ekran yönleri)
-│   ├── patch-ads.py                      # ad-config.json'ı Android/iOS/web uygulamasına işler
+│   ├── patch-podfile.py                  # CI'da iOS Podfile'ını düzenler (pod imzalama, statik framework)
 │   ├── add_privacy_manifest_to_xcodeproj.rb  # Privacy Manifest'i Xcode projesine gerçekten kaydeder
 │   └── generate-export-options.py        # App Store export için exportOptions.plist üretir
-└── www/index.html                        # Uygulamanın kendisi (DEĞİŞTİRİLMEDİ + ek köprü scripti + reklam modülü)
+└── www/index.html                        # Uygulamanın kendisi + ek mobil köprü scripti (reklam/abonelik içermez)
 ```
 
 `android/` ve `ios/` klasörleri kasıtlı olarak repoya eklenmemiştir; her
@@ -314,8 +237,8 @@ bir native proje yerine, her zaman doğru ve güncel bir yapı garanti eder.
 
 ## Uygulama kimliği ve sürüm
 
-- **Paket adı (applicationId):** `com.hemsirerehberi.pro`
-- **Uygulama adı:** Klinik Rehber Pro
+- **Paket adı (applicationId):** `com.klinikrehberpro.app`
+- **Uygulama adı:** Klinik Rehber
 - **versionCode:** Her CI çalıştırmasında otomatik artar (GitHub Actions
   çalıştırma numarasına eşittir) — Play Store'un her yüklemede daha yüksek
   bir versionCode istemesi kuralını otomatik karşılar.
@@ -353,7 +276,7 @@ ve Türkçe karakterlerle** yazılmalıdır (`srcNorm` normalizasyonu uygulanır
 > güncellenmeli ve `SOURCES_LAST_REVIEW` tarihi yenilenmelidir.
 
 ## Uygulama İçi Satın Alma
-Bu sürümde uygulama içi satın alma, otomatik yenilenen abonelik veya premium üyelik sunulmaz. Tüm klinik içerik, ilaç rehberi, hesaplayıcılar, kaynaklar ve nöbet araçları ücretsiz olarak kullanılabilir. Reklam gösterimi yalnızca AdMob ve kullanıcının genel reklam tercihi üzerinden yönetilir.
+Bu sürümde uygulama içi satın alma, otomatik yenilenen abonelik veya premium üyelik sunulmaz. Tüm klinik içerik, ilaç rehberi, hesaplayıcılar, kaynaklar ve nöbet araçları ücretsiz olarak kullanılabilir. **Uygulama hiçbir reklam (banner/geçiş/ödüllü) içermez.**
 
 ## Harici Bağlantıların Açılması
 
@@ -373,7 +296,7 @@ Bu yüzden `www/index.html` içinde, diğer eklentilerden **bağımsız** çalı
   otomatik olarak `window.open` ile yeni sekmeye düşer.
 
 
-## iOS Derleme Sorunları ve Sürüm Sabitleme
+## iOS Derleme Sorunları
 
 `scripts/patch-podfile.py`, CI'da `npx cap sync ios` çalışmadan önce Podfile'a
 iki müdahale yapar:
@@ -383,55 +306,11 @@ CI'daki imzalama kimliği yalnızca ana uygulama hedefi için geçerlidir.
 Kapatılmazsa arşivleme `Signing for <Pod> requires a development team`
 hatasıyla çöker.
 
-### 2) GoogleUserMessagingPlatform'u 2.x serisine sabitler
+### 2) Framework'leri statik bağlar (`use_frameworks! :linkage => :static`)
+Capacitor iOS eklentileri Swift modülü olarak dağıtılır. Bazı statik
+XCFramework tabanlı pod'larla birlikte kullanıldığında CocoaPods'un varsayılan
+dinamik framework bağlaması modül bulma hatalarına yol açabilir; statik bağlama
+bu tür sorunları önler.
 
-`@capacitor-community/admob` eklentisinin iOS kodu, Google'ın rıza (UMP)
-SDK'sının **eski Swift isimlerini** kullanır:
-
-| Eklentinin kullandığı (UMP 2.x) | UMP 3.0+ karşılığı |
-|---|---|
-| `UMPConsentInformation.sharedInstance` | `ConsentInformation.shared` |
-| `UMPConsentStatus` | `ConsentStatus` |
-
-Google, UMP 3.0.0 (24 Mart 2025) ile Swift API isimlerini değiştirdi.
-Eklentinin podspec dosyası UMP sürümünü sabitlemediği için CocoaPods her
-derlemede en güncel sürümü çeker ve derleme şu hatalarla kırılır:
-
-```
-'sharedInstance' has been renamed to 'shared'
-'UMPConsentStatus' has been renamed to 'ConsentStatus'
-** ARCHIVE FAILED **
-```
-
-> Bu, **kodunuzda hiçbir şey değişmeden derlemenin bir gün çalışıp ertesi gün
-> çalışmamasının** sebebidir: Google yeni sürüm yayınladığı anda derleme kırılır.
-
-Script bu yüzden Podfile'a şu satırı ekler:
-
-```ruby
-pod 'GoogleUserMessagingPlatform', '~> 2.0'
-```
-
-`~> 2.0`, 2.x serisinin en güncel sürümünü seçer ama 3.0'a geçmez.
-
-#### Eğer CocoaPods sürüm çakışması bildirirse
-
-`pod install` şuna benzer bir hata verirse:
-
-```
-CocoaPods could not find compatible versions for pod "GoogleUserMessagingPlatform"
-```
-
-Google Mobile Ads SDK'nın çektiği sürüm UMP 3.x istiyor demektir. Bu durumda
-`scripts/patch-podfile.py` içindeki `PINNED_PODS` bloğuna şu satırı da ekleyin:
-
-```ruby
-  pod 'Google-Mobile-Ads-SDK', '~> 11.0'
-```
-
-#### Kalıcı çözüm
-
-`@capacitor-community/admob` eklentisinin UMP 3.x'i destekleyen bir sürümü
-çıktığında (Capacitor 7 gerektirebilir), sabitlemeyi kaldırıp eklentiyi
-yükseltmek daha doğrudur. Sabitleme, o güne kadar derlemeyi öngörülebilir
-kılan geçici bir önlemdir.
+> **Not:** Uygulamada reklam (AdMob/UMP) ve Firebase bulunmadığı için, daha
+> önce açıklanan `GoogleUserMessagingPlatform` sürüm sabitlemesi kaldırılmıştır.

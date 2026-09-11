@@ -39,12 +39,12 @@ def log(msg):
 
 
 def strip_unnecessary_permissions():
-    """NOT: Uygulama artik AdMob reklamlari ve Firebase Analytics icerdigi icin
-    INTERNET ve ACCESS_NETWORK_STATE izinleri ARTIK GEREKLIDIR ve kaldirilmaz.
-    Bu iki izin disinda (kamera, konum, mikrofon, kisiler vb.) hicbir izin
-    Capacitor varsayilan sablonunda zaten bulunmaz; bu fonksiyon yalnizca
-    ileride yanlislikla eklenebilecek gereksiz izinlere karsi bir kontrol
-    gorevi gorur ve INTERNET/ACCESS_NETWORK_STATE'e DOKUNMAZ."""
+    """NOT: Bu izinler WebView tabanli uygulamanin temel calismasi ve
+    harici kaynak baglantilari icin gereklidir; kaldirilmaz. Bu iki izin
+    disinda (kamera, konum, mikrofon, kisiler vb.) hicbir izin Capacitor
+    varsayilan sablonunda zaten bulunmaz; bu fonksiyon yalnizca ileride
+    yanlislikla eklenebilecek gereksiz izinlere karsi bir kontrol gorevi
+    gorur ve INTERNET/ACCESS_NETWORK_STATE'e DOKUNMAZ."""
     if not os.path.exists(MANIFEST_PATH):
         log(f"UYARI: {MANIFEST_PATH} bulunamadi, izin kontrolu atlaniyor.")
         return
@@ -69,7 +69,7 @@ def strip_unnecessary_permissions():
         log("Gercekten gereksiz izinler (kamera/konum/mikrofon/rehber) kaldirildi.")
     else:
         log("Kaldirilacak gereksiz izin bulunamadi.")
-    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU (AdMob/Analytics icin gereklidir).")
+    log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU (WebView ve harici baglantilar icin gereklidir).")
 
 
 def copy_notification_icon():

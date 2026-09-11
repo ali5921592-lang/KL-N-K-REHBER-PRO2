@@ -4,12 +4,13 @@
 patch-podfile.py
 ----------------
 Capacitor'in urettigi ios/App/Podfile dosyasina bir post_install kancasi
-ekler ve TUM Pod hedeflerinde kod imzalamayi kapatir.
+ekler; TUM Pod hedeflerinde kod imzalamayi kapatir ve framework'leri statik
+baglar ('use_frameworks! :linkage => :static').
 
 NEDEN GEREKLI?
 CI ortamindaki imzalama kimligi yalnizca ana uygulama hedefi icin
-gecerlidir. CocoaPods ile gelen bagimliliklar (AdMob, Firebase,
-benzeri eklentiler gibi) ayri hedefler olarak derlenir ve Xcode
+gecerlidir. CocoaPods ile gelen bagimliliklar (Capacitor eklentileri)
+ayri hedefler olarak derlenir ve Xcode
 bunlari da imzalamaya calisirsa arsivleme su hatayla coker:
 
     "No signing certificate iOS Development found"
@@ -33,49 +34,16 @@ import sys
 PODFILE = os.path.join("ios", "App", "Podfile")
 
 MARKER = "# --- CI: Pod hedeflerinde kod imzalamayi kapat ---"
-PIN_MARKER = "# --- CI: Bagimlilik surum sabitleme ---"
-FRAMEWORKS_MARKER = "# --- CI: static framework linkage (FirebaseCore modul hatasi icin) ---"
-
-# ---------------------------------------------------------------------------
-# NEDEN SURUM SABITLEME GEREKLI?
-#
-# @capacitor-community/admob eklentisinin iOS kodu, Google'in User Messaging
-# Platform (UMP) SDK'sinin ESKI Swift isimlerini kullanir:
-#     UMPConsentInformation.sharedInstance   /   UMPConsentStatus
-#
-# Google, UMP 3.0.0 (24 Mart 2025) ile Swift API isimlerini degistirdi:
-#     ConsentInformation.shared              /   ConsentStatus
-#
-# Eklentinin podspec dosyasi UMP surumunu SABITLEMEDIGI icin CocoaPods her
-# derlemede en guncel surumu (3.x) ceker ve derleme su hatalarla coker:
-#     'sharedInstance' has been renamed to 'shared'
-#     'UMPConsentStatus' has been renamed to 'ConsentStatus'
-#
-# Bu, derlemenin "dun calisiyordu bugun calismiyor" davranisinin da
-# sebebidir: kodda hicbir sey degismese bile Google yeni surum yayinladiginda
-# derleme kirilir.
-# ---------------------------------------------------------------------------
-PINNED_PODS = """
-  """ + PIN_MARKER + """
-  pod 'GoogleUserMessagingPlatform', '~> 3.1.0'
-"""
+FRAMEWORKS_MARKER = "# --- CI: static framework linkage ---"
 
 # ---------------------------------------------------------------------------
 # NEDEN use_frameworks! :linkage => :static GEREKLI?
 #
-# @capacitor-firebase/analytics paketinin Swift dosyalari
-# (FirebaseAnalytics.swift) "import FirebaseCore" satirini icerir.
-# Firebase SDK'lari Swift modulu (XCFramework) olarak dagitilir. Ayni
-# projede AdMob / UMP gibi statik XCFramework tabanli baska pod'lar da
-# oldugu icin, CocoaPods'un varsayilan dinamik framework baglamasi
-# (sadece "use_frameworks!") bazen Firebase'in modulunu dogru sekilde
-# expose edemez ve arsivleme su hatayla coker:
-#
-#     "no such module 'FirebaseCore'"
-#
-# COZUM: Frameworks'leri STATIK olarak baglamak. Bu, Firebase dahil
-# tum Swift modullerinin dogru sekilde bulunmasini saglar ve AdMob gibi
-# statik XCFramework'lerle de uyumludur.
+# Capacitor iOS eklentileri Swift modulu olarak dagitilir. Bazi statik
+# XCFramework tabanli pod'larla karisik kullanildiginda CocoaPods'un
+# varsayilan dinamik framework baglamasi modul bulma hatalarina yol
+# acabilir. Frameworks'leri STATIK baglamak bu tur sorunlari onler ve
+# tum eklenti modullerinin dogru sekilde bulunmasini saglar.
 #
 # Podfile'da zaten "use_frameworks!" varsa (parametresiz ya da farkli bir
 # parametreyle), bu satiri ":linkage => :static" ile degistiriyoruz.
@@ -124,8 +92,7 @@ def patch_use_frameworks(content):
     if match:
         content = content[:match.start()] + STATIC_FRAMEWORKS_LINE + content[match.end():]
         log("Mevcut 'use_frameworks!' satiri statik linkage'a "
-            "(':linkage => :static') donusturuldu (FirebaseCore modul "
-            "hatasini onlemek icin).")
+            "(':linkage => :static') donusturuldu.")
         return content, True
 
     # Hic yoksa, "target 'App' do" bloguna, ondan hemen once ekle.
@@ -134,7 +101,7 @@ def patch_use_frameworks(content):
         insert_at = target_match.start()
         content = content[:insert_at] + STATIC_FRAMEWORKS_LINE + "\n\n" + content[insert_at:]
         log("'use_frameworks!' satiri Podfile'da yoktu; statik linkage ile "
-            "yeni eklendi (FirebaseCore modul hatasini onlemek icin).")
+            "yeni eklendi.")
         return content, True
 
     log("UYARI: 'use_frameworks!' eklenecek uygun bir konum bulunamadi "
@@ -153,25 +120,11 @@ def main():
 
     changed = False
 
-    # ---- 1) Bagimlilik surumlerini sabitle ----
-    if PIN_MARKER in content:
-        log("Surum sabitleme zaten mevcut, atlandi.")
-    else:
-        target_match = re.search(r"^target ['\"]App['\"] do\s*$", content, re.MULTILINE)
-        if target_match:
-            insert_at = target_match.end()
-            content = content[:insert_at] + "\n" + PINNED_PODS + content[insert_at:]
-            log("GoogleUserMessagingPlatform '~> 3.1.0' olarak sabitlendi.")
-            changed = True
-        else:
-            log("UYARI: \"target 'App' do\" blogu bulunamadi; surum sabitleme "
-                "eklenemedi. Podfile yapisi beklenenden farkli olabilir.")
-
-    # ---- 2) use_frameworks! satirini statik linkage'a zorla ----
+    # ---- 1) use_frameworks! satirini statik linkage'a zorla ----
     content, fw_changed = patch_use_frameworks(content)
     changed = changed or fw_changed
 
-    # ---- 3) Kod imzalamayi kapat ----
+    # ---- 2) Kod imzalamayi kapat ----
     if MARKER in content:
         log("Imzalama yamasi zaten mevcut, atlandi.")
         if changed:

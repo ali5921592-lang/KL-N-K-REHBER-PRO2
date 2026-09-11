@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Hemşire Rehberi Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<title>Klinik Rehber</title>
+<!-- Harici font/CDN istegi YOK: uygulama tamamen cevrimdisi calisir ve
+     kullanicidan hicbir veri toplamaz (sistem fontlari kullanilir). -->
 <style>
   :root{
     --blue-900:#0B2A66; --blue-700:#1657CF; --blue-500:#3B7DFF; --blue-100:#E8F0FE;
@@ -432,7 +432,7 @@ function viewSources(){
   return `
   <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>Kaynaklar</h1></div>
 
-  <div class="disclaimer">⚠️ Klinik Rehber Pro yalnızca eğitim ve bilgi amaçlı bir referans uygulamasıdır. Tıbbi tavsiye, tanı veya tedavi yerine geçmez. Uygulamadaki tüm tıbbi bilgiler aşağıdaki kaynaklardan derlenmiştir; klinik kararlar hastanın tam değerlendirmesi, kurum protokolleri ve ilgili hekimin/uzmanın görüşü doğrultusunda verilmelidir.</div>
+  <div class="disclaimer">⚠️ Klinik Rehber yalnızca eğitim ve bilgi amaçlı bir referans uygulamasıdır. Tıbbi tavsiye, tanı veya tedavi yerine geçmez. Uygulamadaki tüm tıbbi bilgiler aşağıdaki kaynaklardan derlenmiştir; klinik kararlar hastanın tam değerlendirmesi, kurum protokolleri ve ilgili hekimin/uzmanın görüşü doğrultusunda verilmelidir.</div>
 
   <div class="card">
     <div class="card-title">Bu sayfa nedir?</div>
@@ -6456,7 +6456,7 @@ const ECG_RHYTHMS = [
 /* ============ VARDİYA BİLDİRİM SİSTEMİ ============ */
 const SHIFT_START_HOUR = {'0816':8,'0817':8,'1608':16,'0808':8};
 
-let state = { view:'home', clinicId:null, tab:'ozet', refTab:'kisaltma', searchTerm:'', diseaseIndex:null, drugIndex:null, careIndex:null, dark:false, favorites:{}, notes:[], shifts:{}, scheduleYear:new Date().getFullYear(), scheduleMonth:new Date().getMonth(), selectedDay:null, medSearch:'', medIndex:null, medNotes:{}, interactionPicked:[], interactionResult:null, notifiedShifts:{}, ecgIndex:null, abgResult:null, dayNotes:{}, customShiftMode:false, adEnabled:true, adUseTestIds:true, sectionVisitCount:0, lastInterstitialAt:0, overtimeCategory:'sozlesmeli_lisans', overtimeRateType:'normal', overtimeCustomHours:null };
+let state = { view:'home', clinicId:null, tab:'ozet', refTab:'kisaltma', searchTerm:'', diseaseIndex:null, drugIndex:null, careIndex:null, dark:false, favorites:{}, notes:[], shifts:{}, scheduleYear:new Date().getFullYear(), scheduleMonth:new Date().getMonth(), selectedDay:null, medSearch:'', medIndex:null, medNotes:{}, interactionPicked:[], interactionResult:null, notifiedShifts:{}, ecgIndex:null, abgResult:null, dayNotes:{}, customShiftMode:false, overtimeCategory:'sozlesmeli_lisans', overtimeRateType:'normal', overtimeCustomHours:null };
 
 const SHIFT_TYPES = [
   {code:'0816', label:'08:00-16:00', start:'08:00', end:'16:00', color:'#1657CF'},
@@ -6532,13 +6532,11 @@ async function loadPersisted(){
   try{ const mn = await window.storage.get('med_notes'); state.medNotes = mn ? JSON.parse(mn.value) : {}; }catch(e){ state.medNotes = {}; }
   try{ const ns = await window.storage.get('notified_shifts'); state.notifiedShifts = ns ? JSON.parse(ns.value) : {}; }catch(e){ state.notifiedShifts = {}; }
   try{ const dn = await window.storage.get('day_notes'); state.dayNotes = dn ? JSON.parse(dn.value) : {}; }catch(e){ state.dayNotes = {}; }
-  try{ const asx = await window.storage.get('ad_settings'); const parsed = asx ? JSON.parse(asx.value) : null; state.adEnabled = parsed ? parsed.enabled : true; state.adUseTestIds = parsed ? parsed.useTestIds : true; }catch(e){ state.adEnabled = true; state.adUseTestIds = true; }
   try{ const ot = await window.storage.get('overtime_settings'); const otp = ot ? JSON.parse(ot.value) : null; state.overtimeCategory = otp ? otp.category : 'sozlesmeli_lisans'; state.overtimeRateType = otp ? otp.rateType : 'normal'; }catch(e){ state.overtimeCategory = 'sozlesmeli_lisans'; state.overtimeRateType = 'normal'; }
   render();
   checkUpcomingShifts();
   setInterval(checkUpcomingShifts, 15*60*1000);
 }
-async function saveAdSettings(){ try{ await window.storage.set('ad_settings', JSON.stringify({enabled:state.adEnabled, useTestIds:state.adUseTestIds})); }catch(e){} }
 async function saveFavorites(){ try{ await window.storage.set('favorites', JSON.stringify(state.favorites)); }catch(e){} }
 async function saveNotes(){ try{ await window.storage.set('notes', JSON.stringify(state.notes)); }catch(e){} }
 async function saveTheme(){ try{ await window.storage.set('theme', state.dark ? 'dark' : 'light'); }catch(e){} }
@@ -6660,18 +6658,7 @@ function openClinic(id, tab, idx){
   state.diseaseIndex = tab==='hastaliklar'? idx : null;
   state.drugIndex = tab==='ilaclar'? idx : null;
   state.searchTerm='';
-  state.sectionVisitCount++;
   render();
-}
-/* Reklam icin hassas sayfalar: CPR/acil mudahale, ilac dozu, hesaplayicilar.
-   Bu sayfalarda gecis reklami ASLA gosterilmez (native kopru scripti bu
-   fonksiyonu okur). */
-function isAdSensitiveView(){
-  if(state.view==='calc' || state.view==='abg') return true;
-  if(state.view==='clinic' && (state.clinicId==='acil_112' || state.clinicId==='acil')) return true;
-  if(state.view==='medguide' && state.medIndex!=null) return true;
-  if(state.view==='clinic' && state.tab==='ilaclar' && state.drugIndex!=null) return true;
-  return false;
 }
 
 /* ============ RENDER HELPERS ============ */
@@ -6692,7 +6679,7 @@ function renderTopbar(){
   return `
   <div class="topbar">
     <div class="topbar-row">
-      <div class="brand"><span class="dot"></span>Klinik Rehber Pro</div>
+      <div class="brand"><span class="dot"></span>Klinik Rehber</div>
       <button class="icon-btn" onclick="goto('sources')" title="Kaynaklar">📚</button>
       <button class="icon-btn" onclick="goto('settings')" title="Ayarlar">⚙️</button>
       <button class="icon-btn" onclick="toggleDark()">${state.dark?'☀️':'🌙'}</button>
@@ -6743,7 +6730,7 @@ function renderBottomNav(){
       <span class="ic">${it.ic}</span>${it.label}
     </button>`).join('')}</div>`;
 }
-function goto(v){ state.view=v; state.searchTerm=''; if(v!=='medguide' && v!=='interactions'){ state.medSearch=''; } if(v!=='home') state.sectionVisitCount++; render(); }
+function goto(v){ state.view=v; state.searchTerm=''; if(v!=='medguide' && v!=='interactions'){ state.medSearch=''; } render(); }
 
 function toggleDark(){ state.dark=!state.dark; saveTheme(); render(); }
 
@@ -6786,7 +6773,7 @@ function viewHome(){
         <div class="t">${c.name}</div>
       </div>`).join('')}
   </div>
-  <div class="pdf-note" style="text-align:center;margin-top:22px;opacity:0.7;">© ${new Date().getFullYear()} Klinik Rehber Pro. Tüm hakları saklıdır.<br/>İçerik yalnızca eğitim/bilgi amaçlıdır; tıbbi tavsiye niteliği taşımaz.</div>`;
+  <div class="pdf-note" style="text-align:center;margin-top:22px;opacity:0.7;">© ${new Date().getFullYear()} Klinik Rehber. Tüm hakları saklıdır.<br/>İçerik yalnızca eğitim/bilgi amaçlıdır; tıbbi tavsiye niteliği taşımaz.</div>`;
 }
 
 function clinicSubnav(c){
@@ -7541,26 +7528,16 @@ function viewABG(){
   `;
 }
 
-/* ============ AYARLAR (REKLAM YÖNETİMİ / PREMIUM) ============ */
+/* ============ AYARLAR ============ */
 
 function viewSettings(){
-  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   return `
   <div class="backbar"><button class="icon-btn" onclick="goto('home')">←</button><h1>Ayarlar</h1></div>
 
-
-  <div class="section-title">ℹ️ Reklam Durumu</div>
-  <div class="card">
-    <div class="list-row"><span class="name">Reklam Durumu</span><span class="val">${(!isNative)? 'Devre dışı (tarayıcı)' : (state.adEnabled? 'Etkin' : 'Devre dışı')}</span></div>
-  </div>
-  <div class="pdf-note">CPR/acil müdahale, ilaç dozu ve hesaplayıcı sayfalarında geçiş reklamı hiçbir zaman gösterilmez. Reklamlar yalnızca doğal sayfa geçişlerinde, en az 2 dakika arayla gösterilir.</div>
-
-  ${isNative? `
   <div class="section-title" style="margin-top:20px;">🔒 Gizlilik</div>
   <div class="card">
-    <div class="field-val">Avrupa Birliği/İngiltere/İsviçre'de bulunan kullanıcılar için reklam kişiselleştirme rızanızı istediğiniz zaman gözden geçirip değiştirebilirsiniz.</div>
-    <button class="btn-outline" style="width:100%;margin-top:10px;" onclick="if(typeof window.showPrivacyOptionsForm==='function'){window.showPrivacyOptionsForm();}">Gizlilik Tercihlerini Yönet</button>
-  </div>` : ''}
+    <div class="field-val">Uygulama tamamen çevrimdışı çalışır; kişisel verileriniz cihazınızdan dışarı gönderilmez. Favoriler, notlar ve nöbet bilgileri yalnızca kendi cihazınızda saklanır.</div>
+  </div>
 
   <div class="section-title" style="margin-top:20px;">📚 Kaynaklar</div>
   <div class="card">
@@ -7570,12 +7547,11 @@ function viewSettings(){
 
   <div class="section-title" style="margin-top:20px;">Uygulama Hakkında</div>
   <div class="card">
-    <div class="field-val">Klinik Rehber Pro — sağlık profesyonelleri için klinik referans, ilaç rehberi ve hesaplama araçları.</div>
-    <div class="pdf-note" style="margin-top:10px;">© ${new Date().getFullYear()} Klinik Rehber Pro. Tüm hakları saklıdır.<br/>Bu uygulama yalnızca eğitim ve bilgi amaçlıdır. Klinik kararlar için resmi kılavuzlar ve ilgili sağlık profesyonellerinin değerlendirmesi esas alınmalıdır.</div>
+    <div class="field-val">Klinik Rehber — sağlık profesyonelleri için klinik referans, ilaç rehberi ve hesaplama araçları.</div>
+    <div class="pdf-note" style="margin-top:10px;">© ${new Date().getFullYear()} Klinik Rehber. Tüm hakları saklıdır.<br/>Bu uygulama yalnızca eğitim ve bilgi amaçlıdır. Klinik kararlar için resmi kılavuzlar ve ilgili sağlık profesyonellerinin değerlendirmesi esas alınmalıdır.</div>
   </div>
   `;
 }
-
 function viewFavorites(){
   const keys = Object.keys(state.favorites);
   if(!keys.length) return `<div class="backbar"><h1>Favoriler</h1></div><div class="empty-state"><div class="em">⭐</div>Henüz favori eklemediniz.<br/>İlaç veya hastalık kartlarındaki yıldıza dokunun.</div>`;
@@ -7657,8 +7633,8 @@ loadPersisted();
      tamamen zararsızdır ve sessizce devre dışı kalır.
      ============================================================ -->
 <script>
-/* Bağımsız blok: reklam veya satın alma eklentilerinden BAĞIMSIZ çalışır,
-   böylece o eklentiler yüklenmese bile kaynak bağlantıları açılır. */
+/* Bağımsız blok: harici kaynak bağlantılarını sistem tarayıcısında açar
+   ve native (Capacitor) entegrasyonlarını ekler. */
 (function(){
   var CAP = window.Capacitor || {};
   /* ============================================================
@@ -7935,220 +7911,7 @@ loadPersisted();
       if (st && st.isActive) setTimeout(scheduleShiftNotifications, 800);
     });
   }
-
-  /* ============================================================
-     7) GOOGLE ADMOB + FIREBASE ANALYTICS MODÜLÜ
-     ------------------------------------------------------------
-     - @capacitor-community/admob eklentisi üzerinden banner, geçiş
-       (interstitial) ve ödüllü (rewarded) reklam yönetimi.
-     - Reklam kimlikleri (ad unit ID'leri) ad-config.json dosyasından
-       CI derlemesinde otomatik olarak buraya enjekte edilir
-       (bkz. scripts/patch-ads.py). Aşağıdaki değerler VARSAYILAN
-       olarak Google'ın resmi TEST reklam kimlikleridir.
-     - Premium kullanıcılarda ve state.adEnabled=false durumunda
-       hiçbir reklam çağrısı yapılmaz.
-     - CPR/acil müdahale, ilaç dozu ve hesaplayıcı sayfalarında
-       (isAdSensitiveView()) geçiş reklamı ASLA gösterilmez.
-     ============================================================ */
-  (function(){
-    // ---- AD_CONFIG_START (scripts/patch-ads.py bu blogu ad-config.json'dan uretir) ----
-    var AD_CONFIG = {
-      testMode: false,
-      android: {"appId": "ca-app-pub-7996356702191225~2269771773", "bannerId": "ca-app-pub-7996356702191225/7793561198", "interstitialId": "ca-app-pub-7996356702191225/7945036217", "rewardedId": "ca-app-pub-7996356702191225/9912724000"},
-      ios: {"appId": "ca-app-pub-7996356702191225~2940143624", "bannerId": "ca-app-pub-7996356702191225/2864099920", "interstitialId": "ca-app-pub-7996356702191225/7924854918", "rewardedId": "ca-app-pub-7996356702191225/5298691574"}
-    };
-    // ---- AD_CONFIG_END ----
-
-    if (!Plugins.AdMob) return; // Eklenti yoksa (henuz sync edilmediyse) sessizce devre disi kal.
-    var AdMob = Plugins.AdMob;
-    var FirebaseAnalytics = Plugins.FirebaseAnalytics || null;
-    var platform = (CAP.getPlatform && CAP.getPlatform()) === 'ios' ? 'ios' : 'android';
-    var cfg = AD_CONFIG[platform];
-
-    var adsInitialized = false;
-    var interstitialReady = false;
-    var rewardedReady = false;
-    var lastKnownView = null;
-    var MIN_INTERSTITIAL_GAP_MS = 2 * 60 * 1000; // en az 2 dakika
-    var MIN_SECTIONS_BEFORE_AD = 2 + Math.floor(Math.random() * 3); // 2-4 farkli bolum gezildikten sonra (rastgele)
-    var sessionStartAt = Date.now();
-    var STARTUP_GRACE_MS = 20 * 1000; // uygulama acilir acilmaz reklam gosterme
-
-    function logEvent(name, params){
-      if (!FirebaseAnalytics) return;
-      try { FirebaseAnalytics.logEvent({ name: name, params: params || {} }); } catch(e){}
-    }
-    function isOnline(){
-      try { return navigator.onLine !== false; } catch(e){ return true; }
-    }
-
-    function adsEffectivelyEnabled(){
-      if (typeof state === 'undefined') return false;
-      if (state.adEnabled === false) return false;
-      if (!isOnline()) return false;
-      return true;
-    }
-
-    /* ---------- Başlatma ---------- */
-    function initAds(){
-      if (adsInitialized) return Promise.resolve();
-      return AdMob.initialize({
-        requestTrackingAuthorization: true,
-        initializeForTesting: !!AD_CONFIG.testMode
-      }).then(function(){
-        adsInitialized = true;
-        prepareInterstitial();
-        prepareRewarded();
-      }).catch(function(){});
-    }
-
-    /* ---------- GDPR/UMP RIZA YÖNETİMİ (Google User Messaging Platform) ----------
-       AB/İngiltere/İsviçre kullanıcıları için Google, reklam gösterilmeden
-       önce rıza formu gösterilmesini ZORUNLU kılar (aksi halde AdMob
-       hesabı politika ihlali nedeniyle askıya alınabilir). Bu akış:
-       1) Kullanıcının bölgesine göre rıza gerekip gerekmediğini sorar
-          (requestConsentInfo — konum tespiti Google tarafında yapılır).
-       2) Gerekiyorsa Google'ın standart rıza formunu gösterir.
-       3) Form tamamlandıktan/gerekmediği belirlendikten SONRA reklam
-          SDK'sı başlatılır — asla rızadan önce reklam çağrısı yapılmaz.
-       4) Kullanıcının tercihini daha sonra değiştirebilmesi için
-          window.showPrivacyOptionsForm() dışa açılır (Ayarlar ekranından
-          "Gizlilik Tercihleri" butonuyla çağrılabilir — bu da Google'ın
-          politika gereğidir).
-       Eklenti bu API'leri desteklemiyorsa (eski sürüm), akış sessizce
-       atlanır ve doğrudan initAds() çağrılır; uygulama hata vermez. */
-    var consentHandled = false;
-    function requestConsentThenInitAds(){
-      if (!AdMob.requestConsentInfo) {
-        // Eklenti surumu UMP desteklemiyor; guvenli sekilde dogrudan devam et.
-        return initAds();
-      }
-      return AdMob.requestConsentInfo({ tagForUnderAgeOfConsent: false }).then(function(consentInfo){
-        /* DUZELTME: @capacitor-community/admob bu degeri SAYI degil METIN
-           olarak dondurur ("REQUIRED" / "NOT_REQUIRED" / "OBTAINED" / "UNKNOWN").
-           Onceki kod sayisal 1 ile karsilastirdigi icin kosul hicbir zaman
-           saglanmiyor ve AB kullanicilarina riza formu HIC gosterilmiyordu. */
-        var REQUIRED = 'REQUIRED';
-        if (consentInfo && consentInfo.isConsentFormAvailable && consentInfo.status === REQUIRED) {
-          return AdMob.showConsentForm().catch(function(){});
-        }
-      }).catch(function(){
-        // Riza bilgisi alinamadi (agsiz, eklenti hatasi vb.); guvenli tarafta kalinip devam edilir.
-      }).then(function(){
-        consentHandled = true;
-        return initAds();
-      });
-    }
-    /* Ayarlar ekranindan "Gizlilik Tercihleri" ile cagrilabilir; kullanici
-       rizasini istedigi zaman gozden gecirip degistirebilir (Google zorunlu tutar). */
-    window.showPrivacyOptionsForm = function(){
-      if (AdMob.showPrivacyOptionsForm) {
-        AdMob.showPrivacyOptionsForm().catch(function(){});
-      }
-    };
-
-    /* ---------- Geçiş (Interstitial) Reklam ---------- */
-    function prepareInterstitial(){
-      if (!adsEffectivelyEnabled()) return;
-      AdMob.prepareInterstitial({ adId: cfg.interstitialId, isTesting: !!AD_CONFIG.testMode })
-        .then(function(){ interstitialReady = true; })
-        .catch(function(){ interstitialReady = false; });
-    }
-    function maybeShowInterstitial(){
-      if (!adsEffectivelyEnabled()) return;
-      if (!interstitialReady) return;
-      if (Date.now() - sessionStartAt < STARTUP_GRACE_MS) return; // uygulama acilir acilmaz gosterme
-      if (typeof isAdSensitiveView === 'function' && isAdSensitiveView()) return; // CPR/doz/hesaplayici sayfalarinda gosterme
-      if (typeof state === 'undefined') return;
-      if ((state.sectionVisitCount || 0) < MIN_SECTIONS_BEFORE_AD) return; // yeterli sayida bolum gezilmedi
-      if (Date.now() - (state.lastInterstitialAt || 0) < MIN_INTERSTITIAL_GAP_MS) return; // art arda / cok sik gosterme
-
-      AdMob.showInterstitial().then(function(){
-        state.lastInterstitialAt = Date.now();
-        state.sectionVisitCount = 0; // sayaci sifirla, bir sonraki reklam icin yeniden say
-        MIN_SECTIONS_BEFORE_AD = 3 + Math.floor(Math.random() * 3); // bir sonraki esigi yeniden rastgele belirle (3-5)
-        interstitialReady = false;
-        logEvent('interstitial_shown', { screen: state.view || 'unknown' });
-        // Kapandiktan sonra kullanicinin kaldigi sayfada devam etmesi icin ekstra
-        // bir islem gerekmez (Capacitor AdMob native overlay olarak gosterir,
-        // WebView/uygulama durumu degismez); bir sonraki reklami hemen hazirla.
-        prepareInterstitial();
-      }).catch(function(){
-        interstitialReady = false;
-        prepareInterstitial();
-      });
-    }
-
-    /* ---------- Ödüllü (Rewarded) Reklam ----------
-       İleride "Premium makaleyi ücretsiz aç", "PDF indir" gibi özellikler
-       için hazır altyapı. Çağıran kod şu şekilde kullanabilir:
-         window.showRewardedAd(function(){ /* ödül burada aktive edilir *\/ });
-    */
-    function prepareRewarded(){
-      if (!adsEffectivelyEnabled()) return;
-      AdMob.prepareRewardVideoAd({ adId: cfg.rewardedId, isTesting: !!AD_CONFIG.testMode })
-        .then(function(){ rewardedReady = true; })
-        .catch(function(){ rewardedReady = false; });
-    }
-    window.showRewardedAd = function(onRewardEarned, onUnavailable){
-      if (!adsEffectivelyEnabled() || !rewardedReady) {
-        if (typeof onUnavailable === 'function') onUnavailable();
-        return;
-      }
-      var rewardListener = AdMob.addListener('onRewardedVideoAdReward', function(){
-        logEvent('rewarded_ad_completed', { screen: (state && state.view) || 'unknown' });
-        if (typeof onRewardEarned === 'function') onRewardEarned();
-        try { rewardListener.remove(); } catch(e){}
-      });
-      AdMob.showRewardVideoAd().catch(function(){
-        if (typeof onUnavailable === 'function') onUnavailable();
-      }).finally(function(){
-        rewardedReady = false;
-        prepareRewarded();
-      });
-    };
-
-    /* ---------- Sayfa geçişlerini izleme (render() sarmalayıcısına ek) ----------
-       Odak koruma bölümünde (1) render() zaten sarmalanmıştı; burada aynı
-       fonksiyonu TEKRAR sarmalamak yerine, her render sonrasında çalışacak
-       hafif bir kontrol mekanizması kullanıyoruz (MutationObserver ile
-       #app içeriğinin değiştiğini izleyerek), boylece render() birden
-       fazla kez sarmalanmis olmuyor. */
-    function onAppContentChanged(){
-      if (typeof state === 'undefined') return;
-      if (state.view !== lastKnownView) {
-        lastKnownView = state.view;
-        logEvent('screen_view', { screen_name: state.view || 'unknown' });
-        maybeShowInterstitial();
-      }
-    }
-    var appEl = document.getElementById('app');
-    if (appEl) {
-      try {
-        new MutationObserver(onAppContentChanged).observe(appEl, { childList: true, subtree: false });
-      } catch(e){}
-    }
-
-    /* ---------- Oturum süresi takibi (Analytics) ---------- */
-    var sessionLogged = false;
-    if (Plugins.App && Plugins.App.addListener) {
-      Plugins.App.addListener('appStateChange', function(st){
-        if (st && !st.isActive && !sessionLogged) {
-          sessionLogged = true;
-          logEvent('session_duration', { seconds: Math.round((Date.now() - sessionStartAt) / 1000) });
-        }
-        if (st && st.isActive) { sessionLogged = false; }
-      });
-    }
-
-    /* ---------- Başlat ---------- */
-    setTimeout(function(){
-      requestConsentThenInitAds();
-    }, 800);
-  })();
 })();
-</script>
-
 </script>
 </body>
 </html>

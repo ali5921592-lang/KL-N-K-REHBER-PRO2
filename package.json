@@ -1,7 +1,7 @@
 {
-  "name": "klinik-rehber-pro",
+  "name": "klinik-rehber",
   "version": "1.0.0",
-  "description": "Klinik Rehber Pro - Profesyonel Klinik Referans ve İlaç Rehberi Uygulaması",
+  "description": "Klinik Rehber - Profesyonel Klinik Referans ve İlaç Rehberi Uygulaması",
   "private": true,
   "scripts": {
     "sync": "cap sync",
