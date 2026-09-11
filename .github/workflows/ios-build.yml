@@ -60,17 +60,11 @@ jobs:
       - name: Uygulama ikonu ve splash görsellerini üret
         run: npx capacitor-assets generate --ios
 
-      - name: Reklam kimliklerini (AdMob) projeye işle
-        run: python3 scripts/patch-ads.py
-
       - name: Podfile'ı yamala
         run: python3 scripts/patch-podfile.py
 
       - name: CocoaPods bağımlılıklarıyla iOS senkronizasyonu
         run: npx cap sync ios
-
-      - name: AdMob Swift düzeltmesi
-        run: python3 scripts/patch-admob-swift.py
 
       - name: iOS projesini düzenle
         run: python3 scripts/patch-ios.py
@@ -223,7 +217,7 @@ jobs:
           fi
           echo "IPA dışa aktarma tamamlandı."
 
-      - name: IPA metadata ve abonelik/ATT denetimi
+      - name: IPA metadata ve reklam/abonelik denetimi
         if: steps.signing-check.outputs.has_signing == 'true'
         env:
           EXPECTED_BUNDLE_ID: ${{ steps.params.outputs.bundle_id }}
@@ -242,37 +236,30 @@ jobs:
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
           BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
           MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist")
-          ATT_TEXT=$(/usr/libexec/PlistBuddy -c 'Print :NSUserTrackingUsageDescription' "$APP/Info.plist")
-          GAD_ID=$(/usr/libexec/PlistBuddy -c 'Print :GADApplicationIdentifier' "$APP/Info.plist")
-
           test "$BUNDLE_ID" = "$EXPECTED_BUNDLE_ID"
           test "$VERSION" = "$EXPECTED_VERSION"
           test "$BUILD" = "$EXPECTED_BUILD"
           test "$MIN_OS" = "15.0"
-          test -n "$ATT_TEXT"
-          test -n "$GAD_ID"
 
           if grep -RqiE 'com\.klinikrehberpro\.reklamsiz\.aylik|capacitor-plugin-cdv-purchase|cdv-purchase|purchase-bridge|PAID_SUBSCRIPTION' "$APP"; then
             echo "::error::IPA içinde kaldırılması gereken abonelik/IAP referansı bulundu."
             exit 1
           fi
 
-          echo "IPA denetimi geçti: $BUNDLE_ID / $VERSION ($BUILD), MinimumOSVersion=$MIN_OS, ATT purpose string mevcut, AdMob mevcut, abonelik/IAP referansı yok."
+          echo "IPA denetimi geçti: $BUNDLE_ID / $VERSION ($BUILD), MinimumOSVersion=$MIN_OS, reklam/abonelik/IAP referansı yok."
           {
             echo "### IPA denetimi"
             echo "- Bundle ID: $BUNDLE_ID"
             echo "- Version / Build: $VERSION ($BUILD)"
             echo "- Minimum iOS: $MIN_OS"
-            echo "- ATT purpose string: mevcut"
-            echo "- AdMob: mevcut"
-            echo "- Abonelik/IAP izleri: yok"
+            echo "- Reklam/abonelik/IAP izleri: yok"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: IPA'yı GitHub artifact olarak yükle
         if: steps.signing-check.outputs.has_signing == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: klinik-rehber-pro-ipa-build-${{ steps.params.outputs.build_number }}
+          name: klinik-rehber-ipa-build-${{ steps.params.outputs.build_number }}
           path: build/ipa/*.ipa
           if-no-files-found: error
           retention-days: 90
