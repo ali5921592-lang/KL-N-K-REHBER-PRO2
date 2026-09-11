@@ -57,18 +57,6 @@ jobs:
       - name: Uygulama ikonu ve splash screen gorsellerini uret
         run: npx capacitor-assets generate --android
 
-      - name: Reklam kimliklerini (AdMob) projeye isle
-        run: python3 scripts/patch-ads.py
-
-      - name: Firebase google-services.json dosyasini kopyala (varsa)
-        run: |
-          if [ -f "resources/google-services.json" ]; then
-            cp resources/google-services.json android/app/google-services.json
-            echo "google-services.json android/app/ altina kopyalandi."
-          else
-            echo "UYARI: resources/google-services.json bulunamadi. Firebase Analytics olmadan devam ediliyor."
-          fi
-
       - name: Web varliklarini native projeye senkronize et
         run: npx cap sync android
 
@@ -142,7 +130,7 @@ jobs:
       - name: APK'yi is akisi ciktisi olarak yukle
         uses: actions/upload-artifact@v4
         with:
-          name: klinik-rehber-pro-apk
+          name: klinik-rehber-apk
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 90
@@ -150,7 +138,7 @@ jobs:
       - name: AAB'yi is akisi ciktisi olarak yukle
         uses: actions/upload-artifact@v4
         with:
-          name: klinik-rehber-pro-aab
+          name: klinik-rehber-aab
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 90
