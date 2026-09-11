@@ -5,8 +5,11 @@ patch-android.py
 Capacitor `npx cap add android` ile tazece uretilen native Android
 projesini, GitHub Actions icinde asagidaki sekilde otomatik duzenler:
 
-  1) Gereksiz izinleri kaldirir (uygulama tamamen cevrimdisi calisir,
-     INTERNET / ACCESS_NETWORK_STATE izinlerine ihtiyac yoktur).
+  1) Gereksiz izinleri kaldirir (kamera/konum/mikrofon/kisiler) ve reklam
+     kimligi iznini (com.google.android.gms.permission.AD_ID) manifest
+     birlestirmesinden KESIN olarak kaldirir. Uygulama hicbir reklam SDK'si
+     icermedigi icin Play Console'daki "Reklam Kimligi" beyaninin "Hayir"
+     olmasiyla uyumlu olmasi gerekir.
   2) Bildirim ikonunu (drawable/ic_stat_notify.png) projeye kopyalar.
   3) versionCode degerini CI build numarasina gore artirir (Play Store
      her yuklemede daha yuksek bir versionCode ister).
@@ -70,6 +73,65 @@ def strip_unnecessary_permissions():
     else:
         log("Kaldirilacak gereksiz izin bulunamadi.")
     log("INTERNET ve ACCESS_NETWORK_STATE izinleri KORUNDU (WebView ve harici baglantilar icin gereklidir).")
+
+
+AD_ID_REMOVE_LINE = (
+    '<uses-permission '
+    'android:name="com.google.android.gms.permission.AD_ID" '
+    'tools:node="remove" />'
+)
+
+
+def remove_advertising_id_permission():
+    """Play Console, Android 13+ (API 33+) hedefleyen uygulamalarda reklam
+    kimligi (Advertising ID) kullaniminin BEYAN edilmesini zorunlu kilar.
+
+    Uygulama AdMob/reklam SDK'si icermedigi icin reklam kimligi KULLANMAZ ve
+    beyanin "Hayir" olmasi dogrudur. Ancak herhangi bir kutuphane manifest
+    birlestirme (manifest merger) yoluyla
+    com.google.android.gms.permission.AD_ID iznini eklerse, Play Console
+    "reklam kimligi kullaniyorsunuz ama beyan etmediniz" uyarisini vermeye
+    devam eder. Bu fonksiyon izni tools:node="remove" kuraliyla KESIN olarak
+    kaldirir; boylece beyan ile binary birebir uyumlu olur."""
+    if not os.path.exists(MANIFEST_PATH):
+        log(f"UYARI: {MANIFEST_PATH} bulunamadi, AD_ID izni kontrolu atlaniyor.")
+        return
+    with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    changed = False
+
+    # 1) xmlns:tools bildirimini garanti altina al (tools:node icin gerekli).
+    if "xmlns:tools=" not in content:
+        content = re.sub(
+            r"(<manifest\b[^>]*?)>",
+            r'\1 xmlns:tools="http://schemas.android.com/tools">',
+            content, count=1)
+        changed = True
+
+    # 2) Uygulama manifestinde literal AD_ID izni varsa kaldir.
+    literal = re.search(
+        r"\s*<uses-permission[^>]*com\.google\.android\.gms\.permission\.AD_ID[^>]*/>",
+        content)
+    if literal and "tools:node" not in literal.group(0):
+        content = content.replace(literal.group(0), "")
+        changed = True
+
+    # 3) Manifest birlestirmesinde kaldirma kuralini ekle (idempotent).
+    if 'com.google.android.gms.permission.AD_ID" tools:node="remove"' not in content:
+        content = re.sub(
+            r"(<manifest\b[^>]*>)",
+            r"\1\n    " + AD_ID_REMOVE_LINE,
+            content, count=1)
+        changed = True
+
+    if changed:
+        with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+            f.write(content)
+        log('Reklam kimligi izni (AD_ID) manifest birlestirmesinden KALDIRILDI '
+            '(tools:node="remove").')
+    else:
+        log("AD_ID izni zaten kaldirilmis durumda.")
 
 
 def copy_notification_icon():
@@ -261,6 +323,7 @@ def main():
     has_signing = os.environ.get("HAS_SIGNING_SECRETS", "false").lower() == "true"
 
     strip_unnecessary_permissions()
+    remove_advertising_id_permission()
     set_soft_input_mode()
     copy_notification_icon()
     bump_version_code(version_code)
